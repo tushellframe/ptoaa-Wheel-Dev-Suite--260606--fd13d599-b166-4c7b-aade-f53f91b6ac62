@@ -1,0 +1,6 @@
+{
+  "name": "Wheel Dev Suite",
+  "description": "An interactive Indigenous Medicine Wheel Developer Suite with local offline persistence, circular graph layout visualization, and specification documentation code explorer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
