@@ -77,7 +77,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
     // Focus & Layout configuration states
     var graphHeightDp by remember { mutableStateOf(340.dp) }
     var radiusMultiplier by remember { mutableFloatStateOf(0.65f) }
-    var isFullScreenFocus by remember { mutableStateOf(false) }
+    val isFullScreenFocus by viewModel.isFullScreenFocus.collectAsState()
     var showLayoutSettings by remember { mutableStateOf(false) }
 
     val selectedNode = remember(selectedNodeId, nodes) {
@@ -100,7 +100,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
             .background(Color(0xFF0F0F15))
     ) {
         val isCompact = maxWidth < 750.dp
-        val activeMapHeight = if (isFullScreenFocus) 500.dp else graphHeightDp
+        val activeMapHeight = if (isFullScreenFocus) 600.dp else graphHeightDp
 
         if (isCompact) {
             LazyColumn(
@@ -135,7 +135,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             // Discrete direct Full-Screen toggle button
                             IconButton(
-                                onClick = { isFullScreenFocus = !isFullScreenFocus },
+                                onClick = { viewModel.setFullScreenFocus(!isFullScreenFocus) },
                                 modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
                             ) {
                                 FullscreenIcon(
@@ -303,7 +303,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                                     }
                                     Switch(
                                         checked = isFullScreenFocus,
-                                        onCheckedChange = { isFullScreenFocus = it },
+                                        onCheckedChange = { viewModel.setFullScreenFocus(it) },
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = Color.Black,
                                             checkedTrackColor = ColorEast,
@@ -434,7 +434,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 // Discrete direct Full-Screen toggle button
                                 IconButton(
-                                    onClick = { isFullScreenFocus = !isFullScreenFocus },
+                                    onClick = { viewModel.setFullScreenFocus(!isFullScreenFocus) },
                                     modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
                                 ) {
                                     FullscreenIcon(
@@ -560,7 +560,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                                         }
                                         Switch(
                                             checked = isFullScreenFocus,
-                                            onCheckedChange = { isFullScreenFocus = it },
+                                            onCheckedChange = { viewModel.setFullScreenFocus(it) },
                                             colors = SwitchDefaults.colors(
                                                 checkedThumbColor = Color.Black,
                                                 checkedTrackColor = ColorEast,

@@ -33,6 +33,7 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
     val isSyncing by viewModel.isSyncing.collectAsState()
     val nodes by viewModel.nodes.collectAsState()
     val edges by viewModel.edges.collectAsState()
+    val isFullScreenFocus by viewModel.isFullScreenFocus.collectAsState()
     
     // Core team guide index
     var selectedPersonaIdx by remember { mutableIntStateOf(0) }
@@ -40,57 +41,65 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
     var isCouncilMinimized by remember { mutableStateOf(false) }
     var dragAccumulator by remember { mutableFloatStateOf(0f) }
 
+    LaunchedEffect(isFullScreenFocus) {
+        if (isFullScreenFocus) {
+            isCouncilMinimized = true
+        }
+    }
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing),
         bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFF131320),
-                tonalElevation = 8.dp,
-                windowInsets = WindowInsets.navigationBars
-            ) {
-                NavigationBarItem(
-                    selected = activeScreen == AppScreen.Workspace,
-                    onClick = { viewModel.setScreen(AppScreen.Workspace) },
-                    icon = { Icon(Icons.Default.Search, contentDescription = "Workspace") },
-                    label = { Text("Workspace", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = ColorEast,
-                        indicatorColor = ColorEast,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray
+            if (!isFullScreenFocus) {
+                NavigationBar(
+                    containerColor = Color(0xFF131320),
+                    tonalElevation = 8.dp,
+                    windowInsets = WindowInsets.navigationBars
+                ) {
+                    NavigationBarItem(
+                        selected = activeScreen == AppScreen.Workspace,
+                        onClick = { viewModel.setScreen(AppScreen.Workspace) },
+                        icon = { Icon(Icons.Default.Search, contentDescription = "Workspace") },
+                        label = { Text("Workspace", fontSize = 11.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.Black,
+                            selectedTextColor = ColorEast,
+                            indicatorColor = ColorEast,
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
+                        )
                     )
-                )
 
-                NavigationBarItem(
-                    selected = activeScreen == AppScreen.Store,
-                    onClick = { viewModel.setScreen(AppScreen.Store) },
-                    icon = { Icon(Icons.Default.Refresh, contentDescription = "Storage") },
-                    label = { Text("Edge Store", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = ColorEast,
-                        indicatorColor = ColorEast,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray
+                    NavigationBarItem(
+                        selected = activeScreen == AppScreen.Store,
+                        onClick = { viewModel.setScreen(AppScreen.Store) },
+                        icon = { Icon(Icons.Default.Refresh, contentDescription = "Storage") },
+                        label = { Text("Edge Store", fontSize = 11.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.Black,
+                            selectedTextColor = ColorEast,
+                            indicatorColor = ColorEast,
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
+                        )
                     )
-                )
 
-                NavigationBarItem(
-                    selected = activeScreen == AppScreen.Documentation,
-                    onClick = { viewModel.setScreen(AppScreen.Documentation) },
-                    icon = { Icon(Icons.Default.Info, contentDescription = "Specs") },
-                    label = { Text("Specs Explorer", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Black,
-                        selectedTextColor = ColorEast,
-                        indicatorColor = ColorEast,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray
+                    NavigationBarItem(
+                        selected = activeScreen == AppScreen.Documentation,
+                        onClick = { viewModel.setScreen(AppScreen.Documentation) },
+                        icon = { Icon(Icons.Default.Info, contentDescription = "Specs") },
+                        label = { Text("Specs Explorer", fontSize = 11.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.Black,
+                            selectedTextColor = ColorEast,
+                            indicatorColor = ColorEast,
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
+                        )
                     )
-                )
+                }
             }
         },
         containerColor = Color(0xFF0F0F15)
@@ -249,29 +258,12 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
                             }
                         }
 
-                        // Tactile Drag & Click Handle to toggle minimization
+                        // Tactile Click Handle to toggle minimization
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(22.dp)
+                                .height(28.dp)
                                 .background(Color(0xFF141422))
-                                .pointerInput(Unit) {
-                                    detectDragGestures(
-                                        onDragStart = { dragAccumulator = 0f },
-                                        onDragEnd = {
-                                            if (dragAccumulator < -20f) {
-                                                isCouncilMinimized = true
-                                            } else if (dragAccumulator > 20f) {
-                                                isCouncilMinimized = false
-                                            }
-                                        },
-                                        onDragCancel = { dragAccumulator = 0f },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragAccumulator += dragAmount.y
-                                        }
-                                    )
-                                }
                                 .clickable { isCouncilMinimized = !isCouncilMinimized },
                             contentAlignment = Alignment.Center
                         ) {
@@ -281,16 +273,16 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
                             ) {
                                 Icon(
                                     imageVector = if (isCouncilMinimized) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Toggle minimize",
-                                    tint = ColorEast.copy(alpha = 0.7f),
+                                    contentDescription = if (isCouncilMinimized) "Expand council" else "Minimize council",
+                                    tint = ColorEast,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isCouncilMinimized) "PULL HANDLE TO REVEAL DEEP COUNCIL PERSPECTIVE" else "SWIPE UP OR CLICK TO MINIMIZE PERSPECTIVE PANEL",
-                                    fontSize = 8.sp,
+                                    text = if (isCouncilMinimized) "CLICK TO EXPAND CEREMONIAL COUNCIL PANEL" else "CLICK TO COLLAPSE PERSPECTIVE PANEL",
+                                    fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.Gray,
+                                    color = ColorEast.copy(alpha = 0.9f),
                                     fontFamily = FontFamily.Monospace
                                 )
                             }

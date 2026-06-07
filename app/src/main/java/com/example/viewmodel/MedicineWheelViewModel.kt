@@ -41,6 +41,9 @@ class MedicineWheelViewModel(application: Application) : AndroidViewModel(applic
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
+    private val _isFullScreenFocus = MutableStateFlow(false)
+    val isFullScreenFocus: StateFlow<Boolean> = _isFullScreenFocus.asStateFlow()
+
     init {
         val database = AppDatabase.getDatabase(application)
         repository = MedicineWheelRepository(database)
@@ -64,6 +67,10 @@ class MedicineWheelViewModel(application: Application) : AndroidViewModel(applic
 
     fun setScreen(screen: AppScreen) {
         _activeScreen.value = screen
+    }
+
+    fun setFullScreenFocus(isFull: Boolean) {
+        _isFullScreenFocus.value = isFull
     }
 
     fun selectNode(nodeId: String?) {
