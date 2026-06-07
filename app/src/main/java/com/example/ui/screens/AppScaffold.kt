@@ -174,7 +174,13 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
                 ) {
                     Column {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Row(viewModel = viewModel, selectedPersonaIdx = selectedPersonaIdx, onSelect = { selectedPersonaIdx = it })
+                            CouncilHeaderRow(
+                                selectedPersonaIdx = selectedPersonaIdx,
+                                onSelect = { selectedPersonaIdx = it },
+                                isMinimized = isCouncilMinimized,
+                                onToggleMinimize = { isCouncilMinimized = !isCouncilMinimized },
+                                onCloseAll = { showCouncilGuidance = false }
+                            )
 
                             AnimatedVisibility(
                                 visible = !isCouncilMinimized,
@@ -306,7 +312,13 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
 }
 
 @Composable
-fun Row(viewModel: MedicineWheelViewModel, selectedPersonaIdx: Int, onSelect: (Int) -> Unit) {
+fun CouncilHeaderRow(
+    selectedPersonaIdx: Int,
+    onSelect: (Int) -> Unit,
+    isMinimized: Boolean,
+    onToggleMinimize: () -> Unit,
+    onCloseAll: () -> Unit
+) {
     val personas = listOf("Ava 💕", "Mia 🧠", "Miette 🌸", "Tushell 🌊", "Owl 🦉")
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -314,14 +326,18 @@ fun Row(viewModel: MedicineWheelViewModel, selectedPersonaIdx: Int, onSelect: (I
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "CEREMONIAL PROTOCOL COUNCIL",
-            fontSize = 10.sp,
+            text = "CEREMONIAL COUNCIL",
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             color = ColorEast,
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(end = 4.dp)
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             personas.forEachIndexed { idx, name ->
                 val active = selectedPersonaIdx == idx
                 Box(
@@ -329,15 +345,45 @@ fun Row(viewModel: MedicineWheelViewModel, selectedPersonaIdx: Int, onSelect: (I
                         .clip(RoundedCornerShape(4.dp))
                         .background(if (active) ColorEast else Color(0xFF23233E))
                         .clickable { onSelect(idx) }
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = name,
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         color = if (active) Color.Black else Color.White,
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+            
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Discrete, clear Toggle Minimize Button
+            IconButton(
+                onClick = onToggleMinimize,
+                modifier = Modifier.size(24.dp).background(Color(0xFF23233E), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isMinimized) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                    contentDescription = "Collapse council content",
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(2.dp))
+
+            // Discrete, clear Close Button
+            IconButton(
+                onClick = onCloseAll,
+                modifier = Modifier.size(24.dp).background(Color(0xFF23233E), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss council panel",
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(10.dp)
+                )
             }
         }
     }

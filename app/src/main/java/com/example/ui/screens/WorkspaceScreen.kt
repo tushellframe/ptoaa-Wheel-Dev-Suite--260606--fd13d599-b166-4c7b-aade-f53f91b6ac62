@@ -100,6 +100,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
             .background(Color(0xFF0F0F15))
     ) {
         val isCompact = maxWidth < 750.dp
+        val activeMapHeight = if (isFullScreenFocus) 500.dp else graphHeightDp
 
         if (isCompact) {
             LazyColumn(
@@ -132,6 +133,16 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Discrete direct Full-Screen toggle button
+                            IconButton(
+                                onClick = { isFullScreenFocus = !isFullScreenFocus },
+                                modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                            ) {
+                                FullscreenIcon(
+                                    isFullScreen = isFullScreenFocus,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             // Layout & Focus Settings Toggle button
                             IconButton(
                                 onClick = { showLayoutSettings = !showLayoutSettings },
@@ -328,7 +339,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                         radiusMultiplier = radiusMultiplier,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(graphHeightDp)
+                            .height(activeMapHeight)
                     )
                 }
 
@@ -421,6 +432,16 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                             }
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Discrete direct Full-Screen toggle button
+                                IconButton(
+                                    onClick = { isFullScreenFocus = !isFullScreenFocus },
+                                    modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                                ) {
+                                    FullscreenIcon(
+                                        isFullScreen = isFullScreenFocus,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                                 // Settings button to show/hide controls shelf
                                 IconButton(
                                     onClick = { showLayoutSettings = !showLayoutSettings },
@@ -2208,3 +2229,50 @@ fun ConductCeremonyDialog(
         containerColor = Color(0xFF1E1E2E)
     )
 }
+
+@Composable
+fun FullscreenIcon(isFullScreen: Boolean, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(16.dp)) {
+        val w = size.width
+        val h = size.height
+        val s = 4.dp.toPx()
+        val t = 2.dp.toPx()
+        
+        if (isFullScreen) {
+            // Fullscreen exit icon: arrows pointing inwards or smaller bounds
+            // Top-left corner pointing in
+            drawRect(color = ColorEast, topLeft = Offset(s, s), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = ColorEast, topLeft = Offset(s, s), size = androidx.compose.ui.geometry.Size(t, s))
+            
+            // Top-right corner pointing in
+            drawRect(color = ColorEast, topLeft = Offset(w - s*2, s), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = ColorEast, topLeft = Offset(w - s - t, s), size = androidx.compose.ui.geometry.Size(t, s))
+            
+            // Bottom-left corner pointing in
+            drawRect(color = ColorEast, topLeft = Offset(s, h - s*2), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = ColorEast, topLeft = Offset(s, h - s*2), size = androidx.compose.ui.geometry.Size(t, s))
+            
+            // Bottom-right corner pointing in
+            drawRect(color = ColorEast, topLeft = Offset(w - s*2, h - s*2), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = ColorEast, topLeft = Offset(w - s - t, h - s*2), size = androidx.compose.ui.geometry.Size(t, s))
+        } else {
+            // Fullscreen enter icon: brackets pointing outwards
+            // Top-left bracket
+            drawRect(color = Color.White, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = Color.White, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(t, s))
+            
+            // Top-right bracket
+            drawRect(color = Color.White, topLeft = Offset(w - s, 0f), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = Color.White, topLeft = Offset(w - t, 0f), size = androidx.compose.ui.geometry.Size(t, s))
+            
+            // Bottom-left bracket
+            drawRect(color = Color.White, topLeft = Offset(0f, h - t), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = Color.White, topLeft = Offset(0f, h - s), size = androidx.compose.ui.geometry.Size(t, s))
+            
+            // Bottom-right bracket
+            drawRect(color = Color.White, topLeft = Offset(w - s, h - t), size = androidx.compose.ui.geometry.Size(s, t))
+            drawRect(color = Color.White, topLeft = Offset(w - t, h - s), size = androidx.compose.ui.geometry.Size(t, s))
+        }
+    }
+}
+
