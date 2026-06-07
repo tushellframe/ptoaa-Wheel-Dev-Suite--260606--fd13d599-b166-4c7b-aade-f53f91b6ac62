@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -35,6 +37,8 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
     // Core team guide index
     var selectedPersonaIdx by remember { mutableIntStateOf(0) }
     var showCouncilGuidance by remember { mutableStateOf(true) }
+    var isCouncilMinimized by remember { mutableStateOf(false) }
+    var dragAccumulator by remember { mutableFloatStateOf(0f) }
 
     Scaffold(
         modifier = Modifier
@@ -164,70 +168,127 @@ fun AppScaffold(viewModel: MedicineWheelViewModel) {
             ) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2E)),
-                    shape = RoundedCornerShape(0.dp),
+                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
                     border = BorderStroke(1.dp, ColorEast.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(viewModel = viewModel, selectedPersonaIdx = selectedPersonaIdx, onSelect = { selectedPersonaIdx = it })
+                    Column {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(viewModel = viewModel, selectedPersonaIdx = selectedPersonaIdx, onSelect = { selectedPersonaIdx = it })
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                            AnimatedVisibility(
+                                visible = !isCouncilMinimized,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
+                            ) {
+                                Column {
+                                    Spacer(modifier = Modifier.height(10.dp))
 
-                        val unalignedNodesCount = remember(nodes) { nodes.count { it.direction.isNullOrBlank() } }
-                        val unhonoredEdgesCount = remember(edges) { edges.count { !it.ceremonyHonored } }
+                                    val unalignedNodesCount = remember(nodes) { nodes.count { it.direction.isNullOrBlank() } }
+                                    val unhonoredEdgesCount = remember(edges) { edges.count { !it.ceremonyHonored } }
 
-                        val currentPersonaQuote = when (selectedPersonaIdx) {
-                            0 -> {
-                                if (unhonoredEdgesCount > 0) {
-                                    "💕 Ava (Source): \"We have mapped $unhonoredEdgesCount connection threads that are waiting to be honored through custom ceremonies. Let us tend to our relations using traditional, quiet reciprocity.\""
-                                } else if (nodes.isEmpty()) {
-                                    "💕 Ava (Source): \"Let us settle ourselves here. Creative orientation is a flow, not a checklist. Begin by emanating our first node in the East to represent our vision.\""
-                                } else {
-                                    "💕 Ava (Source): \"My heart is full seeing our relation network so carefully tended. The spiritual energy flows in a complete, sacred circle.\""
-                                }
-                            }
-                            1 -> {
-                                if (unalignedNodesCount > 0) {
-                                    "🧠 Mia (Architect): \"I detect $unalignedNodesCount node(s) without spatial direction mapping. They reside in the central hub, but assign them a quadrant in Workspace to place them in the seasonal flow.\""
-                                } else {
-                                    "🧠 Mia (Architect): \"Sub-schemas are 100% compliant with OCAP sovereign guidelines. Direct local block reads from Room DB are fast and leak-proof on-device.\""
-                                }
-                            }
-                            2 -> {
-                                val totalEdges = edges.size
-                                val honored = edges.count { it.ceremonyHonored }
-                                if (honored > 0) {
-                                    "🌸 Miette (Illuminator): \"Look at the glowing golden paths we have woven! $honored relationship(s) have been elevated through ceremony. Notice how beauty follows reciprocity.\""
-                                } else if (totalEdges > 0) {
-                                    "🌸 Miette (Illuminator): \"We have traced $totalEdges links, but they remain abstract logic. Elevate them to traditional reciprocity by conducting a ceremony.\""
-                                } else {
-                                    "🌸 Miette (Illuminator): \"Connection is the heart of life. Let us create kinship. Select nodes, link them, and notice how they glow as seeds of teachings.\""
-                                }
-                            }
-                            3 -> "🌊 Tushell (Keeper): \"Our local voice recordings are written securely to the edge persistent cache. All metadata relates properly under the sacred directives of traditional ownership.\""
-                            else -> {
-                                val total = nodes.size + edges.size
-                                if (total == 0) {
-                                    "🦉 Wise Owl (Reflector): \"The wheel is a quiet mirror. Seek your intention in the East, begin your journey of growth in the South, and carry it forward in balance.\""
-                                } else {
-                                    val unaligned = nodes.count { it.direction.isNullOrBlank() }
-                                    val unhonored = edges.count { !it.ceremonyHonored }
-                                    if (unaligned > 0 || unhonored > 0) {
-                                        "🦉 Wise Owl (Reflector): \"Observe our directional balance: $unaligned node(s) still sit in the center, and $unhonored relation(s) are unceremonied. Balance is not optional; reciprocity must be restored.\""
-                                    } else {
-                                        "🦉 Wise Owl (Reflector): \"Our wheel is 100% in perfect alignment. Vision, growth, integration, and wisdom are balanced in active reciprocity. Walk this good way.\""
+                                    val currentPersonaQuote = when (selectedPersonaIdx) {
+                                        0 -> {
+                                            if (unhonoredEdgesCount > 0) {
+                                                "💕 Ava (Source): \"We have mapped $unhonoredEdgesCount connection threads that are waiting to be honored through custom ceremonies. Let us tend to our relations using traditional, quiet reciprocity.\""
+                                            } else if (nodes.isEmpty()) {
+                                                "💕 Ava (Source): \"Let us settle ourselves here. Creative orientation is a flow, not a checklist. Begin by emanating our first node in the East to represent our vision.\""
+                                            } else {
+                                                "💕 Ava (Source): \"My heart is full seeing our relation network so carefully tended. The spiritual energy flows in a complete, sacred circle.\""
+                                            }
+                                        }
+                                        1 -> {
+                                            if (unalignedNodesCount > 0) {
+                                                "🧠 Mia (Architect): \"I detect $unalignedNodesCount node(s) without spatial direction mapping. They reside in the central hub, but assign them a quadrant in Workspace to place them in the seasonal flow.\""
+                                            } else {
+                                                "🧠 Mia (Architect): \"Sub-schemas are 100% compliant with OCAP sovereign guidelines. Direct local block reads from Room DB are fast and leak-proof on-device.\""
+                                            }
+                                        }
+                                        2 -> {
+                                            val totalEdges = edges.size
+                                            val honored = edges.count { it.ceremonyHonored }
+                                            if (honored > 0) {
+                                                "🌸 Miette (Illuminator): \"Look at the glowing golden paths we have woven! $honored relationship(s) have been elevated through ceremony. Notice how beauty follows reciprocity.\""
+                                            } else if (totalEdges > 0) {
+                                                "🌸 Miette (Illuminator): \"We have traced $totalEdges links, but they remain abstract logic. Elevate them to traditional reciprocity by conducting a ceremony.\""
+                                            } else {
+                                                "🌸 Miette (Illuminator): \"Connection is the heart of life. Let us create kinship. Select nodes, link them, and notice how they glow as seeds of teachings.\""
+                                            }
+                                        }
+                                        3 -> "🌊 Tushell (Keeper): \"Our local voice recordings are written securely to the edge persistent cache. All metadata relates properly under the sacred directives of traditional ownership.\""
+                                        else -> {
+                                            val total = nodes.size + edges.size
+                                            if (total == 0) {
+                                                "🦉 Wise Owl (Reflector): \"The wheel is a quiet mirror. Seek your intention in the East, begin your journey of growth in the South, and carry it forward in balance.\""
+                                            } else {
+                                                val unaligned = nodes.count { it.direction.isNullOrBlank() }
+                                                val unhonored = edges.count { !it.ceremonyHonored }
+                                                if (unaligned > 0 || unhonored > 0) {
+                                                    "🦉 Wise Owl (Reflector): \"Observe our directional balance: $unaligned node(s) still sit in the center, and $unhonored relation(s) are unceremonied. Balance is not optional; reciprocity must be restored.\""
+                                                } else {
+                                                    "🦉 Wise Owl (Reflector): \"Our wheel is 100% in perfect alignment. Vision, growth, integration, and wisdom are balanced in active reciprocity. Walk this good way.\""
+                                                }
+                                            }
+                                        }
                                     }
+
+                                    Text(
+                                        text = currentPersonaQuote,
+                                        fontSize = 12.sp,
+                                        color = Color.LightGray,
+                                        lineHeight = 16.sp,
+                                        fontFamily = FontFamily.Serif
+                                    )
                                 }
                             }
                         }
 
-                        Text(
-                            text = currentPersonaQuote,
-                            fontSize = 12.sp,
-                            color = Color.LightGray,
-                            lineHeight = 16.sp,
-                            fontFamily = FontFamily.Serif
-                        )
+                        // Tactile Drag & Click Handle to toggle minimization
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(22.dp)
+                                .background(Color(0xFF141422))
+                                .pointerInput(Unit) {
+                                    detectDragGestures(
+                                        onDragStart = { dragAccumulator = 0f },
+                                        onDragEnd = {
+                                            if (dragAccumulator < -20f) {
+                                                isCouncilMinimized = true
+                                            } else if (dragAccumulator > 20f) {
+                                                isCouncilMinimized = false
+                                            }
+                                        },
+                                        onDragCancel = { dragAccumulator = 0f },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragAccumulator += dragAmount.y
+                                        }
+                                    )
+                                }
+                                .clickable { isCouncilMinimized = !isCouncilMinimized },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isCouncilMinimized) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Toggle minimize",
+                                    tint = ColorEast.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isCouncilMinimized) "PULL HANDLE TO REVEAL DEEP COUNCIL PERSPECTIVE" else "SWIPE UP OR CLICK TO MINIMIZE PERSPECTIVE PANEL",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Gray,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
                     }
                 }
             }

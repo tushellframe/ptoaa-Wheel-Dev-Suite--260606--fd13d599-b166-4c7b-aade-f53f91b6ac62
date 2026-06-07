@@ -74,6 +74,12 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
     var linkingFromNodeId by remember { mutableStateOf<String?>(null) }
     var prefilledLinkToNodeId by remember { mutableStateOf<String?>(null) }
 
+    // Focus & Layout configuration states
+    var graphHeightDp by remember { mutableStateOf(340.dp) }
+    var radiusMultiplier by remember { mutableFloatStateOf(0.65f) }
+    var isFullScreenFocus by remember { mutableStateOf(false) }
+    var showLayoutSettings by remember { mutableStateOf(false) }
+
     val selectedNode = remember(selectedNodeId, nodes) {
         nodes.find { it.id == selectedNodeId }
     }
@@ -126,6 +132,17 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Layout & Focus Settings Toggle button
+                            IconButton(
+                                onClick = { showLayoutSettings = !showLayoutSettings },
+                                modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Layout Settings",
+                                    tint = if (showLayoutSettings) ColorEast else Color.Gray
+                                )
+                            }
                             IconButton(
                                 onClick = { viewModel.resetAllNodePositions() },
                                 modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
@@ -151,6 +168,144 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                     }
                 }
 
+                // Collapsible Focus & Layout Settings Controls Card
+                item {
+                    AnimatedVisibility(
+                        visible = showLayoutSettings,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2E)),
+                            border = BorderStroke(1.dp, ColorEast.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "LAYOUT & SIZES HUD",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ColorEast,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                
+                                // Height Controller
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Height: ${graphHeightDp.value.toInt()}dp",
+                                        color = Color.White,
+                                        fontSize = 11.sp
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(240, 340, 460, 580).forEach { h ->
+                                            TextButton(
+                                                onClick = { graphHeightDp = h.dp },
+                                                colors = ButtonDefaults.textButtonColors(
+                                                    contentColor = if (graphHeightDp == h.dp) ColorEast else Color.Gray
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(24.dp)
+                                            ) {
+                                                Text("${h}d", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                                Slider(
+                                    value = graphHeightDp.value,
+                                    onValueChange = { graphHeightDp = it.coerceIn(200f, 650f).dp },
+                                    valueRange = 200f..650f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = ColorEast,
+                                        activeTrackColor = ColorEast,
+                                        inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Node Spread (Radius) Controller
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Node Spread: ${(radiusMultiplier * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontSize = 11.sp
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(0.45f, 0.65f, 0.85f, 1.05f).forEach { r ->
+                                            TextButton(
+                                                onClick = { radiusMultiplier = r },
+                                                colors = ButtonDefaults.textButtonColors(
+                                                    contentColor = if (radiusMultiplier == r) ColorEast else Color.Gray
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(24.dp)
+                                            ) {
+                                                Text("${(r * 100).toInt()}%", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                                Slider(
+                                    value = radiusMultiplier,
+                                    onValueChange = { radiusMultiplier = it },
+                                    valueRange = 0.3f..1.2f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = ColorEast,
+                                        activeTrackColor = ColorEast,
+                                        inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Full Screen Focus Toggle Button
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Full Screen Focus Mode",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "Collapses inspector to maximize active focus space",
+                                            color = Color.Gray,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isFullScreenFocus,
+                                        onCheckedChange = { isFullScreenFocus = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = ColorEast,
+                                            uncheckedThumbColor = Color.Gray,
+                                            uncheckedTrackColor = Color(0xFF23233E)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Interactive Wheel item
                 item {
                     MedicineWheelGraph(
@@ -170,40 +325,57 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                             preselectedAddDirection = dir
                             showAddNodeDialog = true
                         },
+                        radiusMultiplier = radiusMultiplier,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(340.dp)
+                            .height(graphHeightDp)
                     )
                 }
 
                 // Inspector card item (flows downward scrollably)
                 item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF131320)),
-                        border = BorderStroke(1.dp, Color(0xFF1E1E34)),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            if (selectedNode != null) {
-                                NodeInspectorPanel(
-                                    node = selectedNode,
-                                    edges = edges,
-                                    allNodes = nodes,
-                                    viewModel = viewModel,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onConductCeremony = { activeEdgeForCeremony = it },
-                                    onClose = { viewModel.selectNode(null) }
-                                )
-                            } else {
-                                EmptyInspectorPanel(
-                                    nodeCount = nodes.size,
-                                    edgeCount = edges.size,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                                )
+                    if (!isFullScreenFocus) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF131320)),
+                            border = BorderStroke(1.dp, Color(0xFF1E1E34)),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                if (selectedNode != null) {
+                                    NodeInspectorPanel(
+                                        node = selectedNode,
+                                        edges = edges,
+                                        allNodes = nodes,
+                                        viewModel = viewModel,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onConductCeremony = { activeEdgeForCeremony = it },
+                                        onClose = { viewModel.selectNode(null) }
+                                    )
+                                } else {
+                                    EmptyInspectorPanel(
+                                        nodeCount = nodes.size,
+                                        edgeCount = edges.size,
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                                    )
+                                }
                             }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✨ ZEN FOCUS ACTIVE - CLICK HEADER GEAR TO ADJUST",
+                                color = Color.Gray,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
                     }
                 }
@@ -214,9 +386,10 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // Left Column or primary block: the actual interactive wheel representation
+                val leftWeight = if (isFullScreenFocus) 2.2f else 1.2f
                 Box(
                     modifier = Modifier
-                        .weight(1.2f)
+                        .weight(leftWeight)
                         .fillMaxHeight()
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
@@ -248,6 +421,17 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                             }
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Settings button to show/hide controls shelf
+                                IconButton(
+                                    onClick = { showLayoutSettings = !showLayoutSettings },
+                                    modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Layout Settings",
+                                        tint = if (showLayoutSettings) ColorEast else Color.Gray
+                                    )
+                                }
                                 IconButton(
                                     onClick = { viewModel.resetAllNodePositions() },
                                     modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
@@ -272,6 +456,102 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                             }
                         }
 
+                        // Collapsible Focus & Layout Settings Card inside tablet side
+                        AnimatedVisibility(
+                            visible = showLayoutSettings,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E2E)),
+                                border = BorderStroke(1.dp, ColorEast.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(
+                                        text = "FOCUS & LAYOUT CONTROLLERS",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ColorEast,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    
+                                    // Node Spread (Radius) Controller
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Node Spread: ${(radiusMultiplier * 100).toInt()}%",
+                                            color = Color.White,
+                                            fontSize = 11.sp
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            listOf(0.45f, 0.65f, 0.85f, 1.05f).forEach { r ->
+                                                TextButton(
+                                                    onClick = { radiusMultiplier = r },
+                                                    colors = ButtonDefaults.textButtonColors(
+                                                        contentColor = if (radiusMultiplier == r) ColorEast else Color.Gray
+                                                    ),
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(24.dp)
+                                                ) {
+                                                    Text("${(r * 100).toInt()}%", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Slider(
+                                        value = radiusMultiplier,
+                                        onValueChange = { radiusMultiplier = it },
+                                        valueRange = 0.3f..1.2f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = ColorEast,
+                                            activeTrackColor = ColorEast,
+                                            inactiveTrackColor = Color.Gray.copy(alpha = 0.3f)
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Full Screen Focus Mode
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Full Screen Focus Mode",
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = "Hides right inspector panel to widen relational workspace",
+                                                color = Color.Gray,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isFullScreenFocus,
+                                            onCheckedChange = { isFullScreenFocus = it },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.Black,
+                                                checkedTrackColor = ColorEast,
+                                                uncheckedThumbColor = Color.Gray,
+                                                uncheckedTrackColor = Color(0xFF23233E)
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // Interactive Circle Box
                         MedicineWheelGraph(
                             nodes = nodes,
@@ -290,6 +570,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                                 preselectedAddDirection = dir
                                 showAddNodeDialog = true
                             },
+                            radiusMultiplier = radiusMultiplier,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
@@ -298,30 +579,32 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                 }
 
                 // Right Column: Node Inspector & Obligation audits
-                Box(
-                    modifier = Modifier
-                        .weight(0.8f)
-                        .fillMaxHeight()
-                        .background(Color(0xFF131320))
-                        .border(1.dp, Color(0xFF1E1E34))
-                        .padding(16.dp)
-                ) {
-                    if (selectedNode != null) {
-                        NodeInspectorPanel(
-                            node = selectedNode,
-                            edges = edges,
-                            allNodes = nodes,
-                            viewModel = viewModel,
-                            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                            onConductCeremony = { activeEdgeForCeremony = it },
-                            onClose = { viewModel.selectNode(null) }
-                        )
-                    } else {
-                        EmptyInspectorPanel(
-                            nodeCount = nodes.size,
-                            edgeCount = edges.size,
-                            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                        )
+                if (!isFullScreenFocus) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.8f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF131320))
+                            .border(1.dp, Color(0xFF1E1E34))
+                            .padding(16.dp)
+                    ) {
+                        if (selectedNode != null) {
+                            NodeInspectorPanel(
+                                node = selectedNode,
+                                edges = edges,
+                                allNodes = nodes,
+                                viewModel = viewModel,
+                                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                                onConductCeremony = { activeEdgeForCeremony = it },
+                                onClose = { viewModel.selectNode(null) }
+                            )
+                        } else {
+                            EmptyInspectorPanel(
+                                nodeCount = nodes.size,
+                                edgeCount = edges.size,
+                                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                            )
+                        }
                     }
                 }
             }
@@ -393,6 +676,7 @@ fun MedicineWheelGraph(
     onCancelLink: () -> Unit,
     onSelectToLink: (String) -> Unit,
     onDoubleTap: (String?) -> Unit,
+    radiusMultiplier: Float = 0.65f,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -422,7 +706,7 @@ fun MedicineWheelGraph(
         ) {
             val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
             val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
-            val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
+            val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * radiusMultiplier
             
             val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
                 calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
