@@ -58,6 +58,121 @@ class StaticSpecItem(
     override val aspects: List<SpecAspect>
 ) : SpecItem
 
+@Composable
+private fun ComplianceAuditCard(
+    isCompliant: Boolean,
+    complianceScore: Int,
+    scoreMessage: String,
+    unalignedNodesCount: Int,
+    unhonoredEdgesCount: Int
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF131320)),
+        border = BorderStroke(1.dp, if (isCompliant) Color(0xFF33B3A6).copy(alpha = 0.5f) else ColorSouth.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "TRADITIONAL CO-COORDINATE AUDIT",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    fontFamily = FontFamily.Monospace
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isCompliant) Color(0xFF33B3A6).copy(alpha = 0.2f) else ColorSouth.copy(alpha = 0.2f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (isCompliant) "SECURE" else "GAP STACKED",
+                        color = if (isCompliant) Color(0xFF33B3A6) else ColorSouth,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "$complianceScore%",
+                    color = if (isCompliant) Color(0xFF33B3A6) else ColorEast,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 24.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Column {
+                    Text(
+                        text = "Sovereignty Compliance Index",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = scoreMessage,
+                        color = Color.LightGray,
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF23233E))
+            ) {
+                val compPart = complianceScore / 100f
+                Box(modifier = Modifier.fillMaxHeight().weight(compPart.coerceAtLeast(0.01f)).background(if (isCompliant) Color(0xFF33B3A6) else ColorEast))
+                if (compPart < 1f) {
+                    Box(modifier = Modifier.fillMaxHeight().weight((1f - compPart).coerceAtLeast(0.01f)).background(ColorSouth))
+                }
+            }
+
+            if (!isCompliant) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(ColorSouth.copy(alpha = 0.1f))
+                        .border(1.dp, ColorSouth.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                        .padding(8.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = ColorSouth, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("RELATIONAL OFFENSE RECTIFICATION REQUIRED", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = ColorSouth, fontFamily = FontFamily.Monospace)
+                        }
+                        if (unalignedNodesCount > 0) {
+                            Text("• Align $unalignedNodesCount space-less nodes with their Traditional Direction in Workspace.", fontSize = 9.sp, color = Color.LightGray)
+                        }
+                        if (unhonoredEdgesCount > 0) {
+                            Text("• Conduct Smudging/Talking Circle on $unhonoredEdgesCount relations to honor kinship.", fontSize = 9.sp, color = Color.LightGray)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modifier) {
@@ -95,7 +210,7 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
     // Categories available
     val categories = listOf("All", "Core Ontology", "Spatial Graphics", "Ceremy Protocols", "Sovereignty", "MCP Interface")
 
-    // Filter specs by query and class
+    // Filter specs by query and category
     val filteredSpecs = specs.filter { spec ->
         val matchesQuery = spec.title.contains(searchQuery, ignoreCase = true) || 
                            spec.ojibweName.contains(searchQuery, ignoreCase = true) || 
@@ -106,188 +221,89 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
         matchesQuery && matchesCat
     }
 
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F15)),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .background(Color(0xFF0F0F15))
     ) {
-        // LEFT COLUMN: Navigation list with compliance metrics, search filters
-        Column(
-            modifier = Modifier
-                .weight(1.0f)
-                .fillMaxHeight()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "TRADITIONAL PROTOCOL SPECIFICATIONS",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = ColorEast,
-                fontFamily = FontFamily.Monospace
-            )
+        val isCompact = maxWidth < 750.dp
 
-            // DYNAMIC COMPLIANCE AUDIT CO-COORDINATE DIAGNOSTIC GAUGE (OCAP & Sovereignty Rules)
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF131320)),
-                border = BorderStroke(1.dp, if (isCompliant) Color(0xFF33B3A6).copy(alpha = 0.5f) else ColorSouth.copy(alpha = 0.3f)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+        if (isCompact) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "TRADITIONAL CO-COORDINATE AUDIT",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Gray,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (isCompliant) Color(0xFF33B3A6).copy(alpha = 0.2f) else ColorSouth.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = if (isCompliant) "SECURE" else "GAP STACKED",
-                                color = if (isCompliant) Color(0xFF33B3A6) else ColorSouth,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "$complianceScore%",
-                            color = if (isCompliant) Color(0xFF33B3A6) else ColorEast,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 24.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Column {
-                            Text(
-                                text = "Sovereignty Compliance Index",
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = scoreMessage,
-                                color = Color.LightGray,
-                                fontSize = 10.sp,
-                                lineHeight = 13.sp
-                            )
-                        }
-                    }
+                item {
+                    Text(
+                        text = "TRADITIONAL PROTOCOL SPECIFICATIONS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorEast,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                item {
+                    ComplianceAuditCard(
+                        isCompliant = isCompliant,
+                        complianceScore = complianceScore,
+                        scoreMessage = scoreMessage,
+                        unalignedNodesCount = unalignedNodes.size,
+                        unhonoredEdgesCount = unhonoredEdges.size
+                    )
+                }
 
-                    // Simulated multi-segment custom timeline representing OCAP rules
-                    Row(
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search specifications / schemas...", fontSize = 12.sp, color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp)) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF23233E))
-                    ) {
-                        val compPart = complianceScore / 100f
-                        Box(modifier = Modifier.fillMaxHeight().weight(compPart.coerceAtLeast(0.01f)).background(if (isCompliant) Color(0xFF33B3A6) else ColorEast))
-                        if (compPart < 1f) {
-                            Box(modifier = Modifier.fillMaxHeight().weight((1f - compPart).coerceAtLeast(0.01f)).background(ColorSouth))
-                        }
-                    }
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.LightGray,
+                            focusedContainerColor = Color(0xFF131320),
+                            unfocusedContainerColor = Color(0xFF131320),
+                            focusedBorderColor = ColorEast,
+                            unfocusedBorderColor = Color(0xFF23233E)
+                        ),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                    )
+                }
 
-                    // Direct Actionable Traditional Guidelines Warning
-                    if (!isCompliant) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(ColorSouth.copy(alpha = 0.1f))
-                                .border(1.dp, ColorSouth.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                                .padding(8.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Warning, contentDescription = null, tint = ColorSouth, modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("RELATIONAL OFFENSE RECTIFICATION REQUIRED", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = ColorSouth, fontFamily = FontFamily.Monospace)
-                                }
-                                if (unalignedNodes.isNotEmpty()) {
-                                    Text("• Align ${unalignedNodes.size} space-less nodes with their Traditional Direction in Workspace.", fontSize = 9.sp, color = Color.LightGray)
-                                }
-                                if (unhonoredEdges.isNotEmpty()) {
-                                    Text("• Conduct Smudging/Talking Circle on ${unhonoredEdges.size} relations to honor kinship.", fontSize = 9.sp, color = Color.LightGray)
-                                }
+                item {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(categories) { cat ->
+                            val active = selectedCategory == cat
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(30.dp))
+                                    .background(if (active) ColorEast else Color(0xFF1E1E2E))
+                                    .clickable { selectedCategory = cat }
+                                    .border(1.dp, if (active) ColorEast else Color(0xFF23233E), RoundedCornerShape(30.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = cat,
+                                    fontSize = 10.sp,
+                                    color = if (active) Color.Black else Color.LightGray,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
                 }
-            }
 
-            // SEARCH AND CATEGORY FILTERING CONTAINER
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search specifications / schemas...", fontSize = 12.sp, color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.LightGray,
-                    focusedContainerColor = Color(0xFF131320),
-                    unfocusedContainerColor = Color(0xFF131320),
-                    focusedBorderColor = ColorEast,
-                    unfocusedBorderColor = Color(0xFF23233E)
-                ),
-                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
-            )
-
-            // Horizontal Category Pill Line
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(categories) { cat ->
-                    val active = selectedCategory == cat
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(30.dp))
-                            .background(if (active) ColorEast else Color(0xFF1E1E2E))
-                            .clickable { selectedCategory = cat }
-                            .border(1.dp, if (active) ColorEast else Color(0xFF23233E), RoundedCornerShape(30.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = cat,
-                            fontSize = 10.sp,
-                            color = if (active) Color.Black else Color.LightGray,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // DOMAIN SPECIFICATIONS NAVIGATION VERTICAL LIST
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
                 if (filteredSpecs.isEmpty()) {
                     item {
                         Column(
@@ -302,27 +318,26 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
                         }
                     }
                 } else {
-                    itemsIndexed(specs) { idx, spec ->
-                        // Only visualise if it complies with the selected category filter
-                        val belongsFilter = selectedCategory == "All" || spec.domain == selectedCategory
-                        if (belongsFilter) {
-                            val active = idx == selectedSpecIndex
-                            val matchesSearchHighlight = searchQuery.isNotBlank() && spec.title.contains(searchQuery, ignoreCase = true)
-                            
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedSpecIndex = idx },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (active) Color(0xFF1E1E2E) else Color(0xFF13131F)
-                                ),
-                                border = BorderStroke(
-                                    width = 1.dp,
-                                    color = if (active) ColorEast else if (matchesSearchHighlight) ColorEast.copy(alpha = 0.5f) else Color(0xFF23233E)
-                                )
-                            ) {
+                    itemsIndexed(filteredSpecs) { idx, spec ->
+                        val originalIndex = specs.indexOfFirst { it.id == spec.id }
+                        val isExpanded = originalIndex == selectedSpecIndex
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isExpanded) Color(0xFF1E1E2E) else Color(0xFF13131F)
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = if (isExpanded) ColorEast else Color(0xFF23233E)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Row(
-                                    modifier = Modifier.padding(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedSpecIndex = if (isExpanded) -1 else originalIndex },
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -334,13 +349,13 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
                                             modifier = Modifier
                                                 .size(28.dp)
                                                 .clip(CircleShape)
-                                                .background(if (active) ColorEast.copy(alpha = 0.2f) else Color(0xFF23233E)),
+                                                .background(if (isExpanded) ColorEast.copy(alpha = 0.2f) else Color(0xFF23233E)),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
                                                 imageVector = spec.icon,
                                                 contentDescription = null,
-                                                tint = if (active) ColorEast else Color.Gray,
+                                                tint = if (isExpanded) ColorEast else Color.Gray,
                                                 modifier = Modifier.size(14.dp)
                                             )
                                         }
@@ -350,7 +365,7 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
                                                 text = spec.title,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (active) Color.White else Color.LightGray
+                                                color = if (isExpanded) Color.White else Color.LightGray
                                             )
                                             Text(
                                                 text = "${spec.domain} • ${spec.ojibweName}",
@@ -360,24 +375,184 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
                                         }
                                     }
 
-                                    // Tiny Status badges
-                                    val badgeColor = when (spec.status) {
-                                        "Implemented" -> Color(0xFF33B3A6)
-                                        "Active Draft" -> ColorEast
-                                        else -> ColorSouth
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(badgeColor.copy(alpha = 0.15f))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text(
-                                            text = spec.status,
-                                            color = badgeColor,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
+                                        val badgeColor = when (spec.status) {
+                                            "Implemented" -> Color(0xFF33B3A6)
+                                            "Active Draft" -> ColorEast
+                                            else -> ColorSouth
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(badgeColor.copy(alpha = 0.15f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = spec.status,
+                                                color = badgeColor,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(18.dp)
                                         )
+                                    }
+                                }
+
+                                AnimatedVisibility(visible = isExpanded) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 12.dp)
+                                    ) {
+                                        HorizontalDivider(color = Color(0xFF1E1E34), modifier = Modifier.padding(bottom = 12.dp))
+                                        
+                                        if (spec.diagramType != "none") {
+                                            Text(
+                                                text = "COSMOLOGICAL CANVAS DIAGRAM",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.Gray,
+                                                fontFamily = FontFamily.Monospace,
+                                                modifier = Modifier.padding(bottom = 6.dp)
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(140.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(Color(0xFF0F0F15))
+                                                    .border(1.dp, Color(0xFF23233E), RoundedCornerShape(8.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                SpecDiagramRenderer(diagramType = spec.diagramType)
+                                            }
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                        }
+
+                                        Text(
+                                            text = "DESIGN PROSE & LOGICAL BLUEPRINT",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Gray,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                        Text(
+                                            text = spec.content,
+                                            color = Color.LightGray,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            modifier = Modifier.padding(bottom = 12.dp)
+                                        )
+
+                                        if (spec.aspects.isNotEmpty()) {
+                                            HorizontalDivider(color = Color(0xFF1E1E34), modifier = Modifier.padding(bottom = 10.dp))
+                                            Text(
+                                                text = "SUB-DOMAINS & INTERFACE FUNCTIONAL SCHEMAS",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ColorEast,
+                                                fontFamily = FontFamily.Monospace,
+                                                modifier = Modifier.padding(bottom = 6.dp)
+                                            )
+
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                spec.aspects.forEachIndexed { aIdx, aspect ->
+                                                    var aspectExpanded by remember { mutableStateOf(false) }
+                                                    Card(
+                                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF191928)),
+                                                        border = BorderStroke(1.dp, if (aspectExpanded) ColorEast.copy(alpha = 0.4f) else Color(0xFF23233E)),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable { aspectExpanded = !aspectExpanded }
+                                                    ) {
+                                                        Column(modifier = Modifier.padding(10.dp)) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Column {
+                                                                    Text(
+                                                                        text = "${originalIndex + 1}.${aIdx + 1} ${aspect.title}",
+                                                                        fontSize = 12.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color.White
+                                                                    )
+                                                                    Text(
+                                                                        text = "Ojibwe: ${aspect.ojibweName}",
+                                                                        fontSize = 10.sp,
+                                                                        color = Color.Gray
+                                                                    )
+                                                                }
+
+                                                                Row(
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                ) {
+                                                                    val aBadgeColor = when (aspect.status) {
+                                                                        "Implemented" -> Color(0xFF33B3A6)
+                                                                        "Active Draft" -> ColorEast
+                                                                        else -> Color(0xFFFF3B30)
+                                                                    }
+                                                                    Text(
+                                                                        text = aspect.status,
+                                                                        color = aBadgeColor,
+                                                                        fontSize = 8.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        modifier = Modifier
+                                                                            .clip(RoundedCornerShape(4.dp))
+                                                                            .background(aBadgeColor.copy(alpha = 0.15f))
+                                                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                    )
+                                                                    Icon(
+                                                                        imageVector = if (aspectExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                                        contentDescription = null,
+                                                                        tint = Color.Gray,
+                                                                        modifier = Modifier.size(16.dp)
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            AnimatedVisibility(visible = aspectExpanded) {
+                                                                Column(modifier = Modifier.padding(top = 8.dp)) {
+                                                                    Text(
+                                                                        text = aspect.description,
+                                                                        fontSize = 11.sp,
+                                                                        color = Color.LightGray,
+                                                                        lineHeight = 15.sp,
+                                                                        modifier = Modifier.padding(bottom = 8.dp)
+                                                                    )
+
+                                                                    if (aspect.schemaCode.isNotBlank()) {
+                                                                        Text(
+                                                                            text = "STRUCTURED SCHEMA DEFINITION:",
+                                                                            fontSize = 8.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = Color.Gray,
+                                                                            fontFamily = FontFamily.Monospace,
+                                                                            modifier = Modifier.padding(bottom = 2.dp)
+                                                                        )
+                                                                        HighlightedCodeView(code = aspect.schemaCode)
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -385,217 +560,388 @@ fun DocumentationScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = 
                     }
                 }
             }
-        }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // LEFT COLUMN: Navigation list with compliance metrics, search filters
+                Column(
+                    modifier = Modifier
+                        .weight(1.0f)
+                        .fillMaxHeight()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "TRADITIONAL PROTOCOL SPECIFICATIONS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorEast,
+                        fontFamily = FontFamily.Monospace
+                    )
 
-        // RIGHT COLUMN: Detailed Specification Reader & Aspect / Class Code Collapser
-        Box(
-            modifier = Modifier
-                .weight(1.2f)
-                .fillMaxHeight()
-                .background(Color(0xFF131320))
-                .border(BorderStroke(1.dp, Color(0xFF1E1E34)))
-                .padding(16.dp)
-        ) {
-            if (selectedSpecIndex in specs.indices) {
-                val spec = specs[selectedSpecIndex]
-                
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
+                    ComplianceAuditCard(
+                        isCompliant = isCompliant,
+                        complianceScore = complianceScore,
+                        scoreMessage = scoreMessage,
+                        unalignedNodesCount = unalignedNodes.size,
+                        unhonoredEdgesCount = unhonoredEdges.size
+                    )
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search specifications / schemas...", fontSize = 12.sp, color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.LightGray,
+                            focusedContainerColor = Color(0xFF131320),
+                            unfocusedContainerColor = Color(0xFF131320),
+                            focusedBorderColor = ColorEast,
+                            unfocusedBorderColor = Color(0xFF23233E)
+                        ),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                    )
+
+                    LazyRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "SPECIFICATION EXPLORER ENGINE",
-                            fontSize = 10.sp,
-                            color = ColorEast,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF33B3A6)))
-                            Text(text = "DYNAMIC", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                        items(categories) { cat ->
+                            val active = selectedCategory == cat
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(30.dp))
+                                    .background(if (active) ColorEast else Color(0xFF1E1E2E))
+                                    .clickable { selectedCategory = cat }
+                                    .border(1.dp, if (active) ColorEast else Color(0xFF23233E), RoundedCornerShape(30.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = cat,
+                                    fontSize = 10.sp,
+                                    color = if (active) Color.Black else Color.LightGray,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = spec.title,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Traditional Dimension: ${spec.ojibweName}",
-                            fontSize = 12.sp,
-                            color = ColorEast,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "|  Domain: ${spec.domain}",
-                            fontSize = 11.sp,
-                            color = Color.Gray
-                        )
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (filteredSpecs.isEmpty()) {
+                            item {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 40.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(36.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("No specs match search terms.", color = Color.Gray, fontSize = 12.sp)
+                                }
+                            }
+                        } else {
+                            itemsIndexed(specs) { idx, spec ->
+                                val belongsFilter = selectedCategory == "All" || spec.domain == selectedCategory
+                                if (belongsFilter) {
+                                    val active = idx == selectedSpecIndex
+                                    val matchesSearchHighlight = searchQuery.isNotBlank() && spec.title.contains(searchQuery, ignoreCase = true)
+                                    
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { selectedSpecIndex = idx },
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (active) Color(0xFF1E1E2E) else Color(0xFF13131F)
+                                        ),
+                                        border = BorderStroke(
+                                            width = 1.dp,
+                                            color = if (active) ColorEast else if (matchesSearchHighlight) ColorEast.copy(alpha = 0.5f) else Color(0xFF23233E)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (active) ColorEast.copy(alpha = 0.2f) else Color(0xFF23233E)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = spec.icon,
+                                                        contentDescription = null,
+                                                        tint = if (active) ColorEast else Color.Gray,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Column {
+                                                    Text(
+                                                        text = spec.title,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (active) Color.White else Color.LightGray
+                                                    )
+                                                    Text(
+                                                        text = "${spec.domain} • ${spec.ojibweName}",
+                                                        fontSize = 10.sp,
+                                                        color = Color.Gray
+                                                    )
+                                                }
+                                            }
+
+                                            val badgeColor = when (spec.status) {
+                                                "Implemented" -> Color(0xFF33B3A6)
+                                                "Active Draft" -> ColorEast
+                                                else -> ColorSouth
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(badgeColor.copy(alpha = 0.15f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = spec.status,
+                                                    color = badgeColor,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = Color(0xFF1E1E34))
-                    Spacer(modifier = Modifier.height(10.dp))
+                // RIGHT COLUMN: Detailed Specification Reader & Aspect / Class Code Collapser
+                Box(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight()
+                        .background(Color(0xFF131320))
+                        .border(BorderStroke(1.dp, Color(0xFF1E1E34)))
+                        .padding(16.dp)
+                ) {
+                    if (selectedSpecIndex in specs.indices) {
+                        val spec = specs[selectedSpecIndex]
+                        
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SPECIFICATION EXPLORER ENGINE",
+                                    fontSize = 10.sp,
+                                    color = ColorEast,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF33B3A6)))
+                                    Text(text = "DYNAMIC", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                                }
+                            }
 
-                    // RENDER DYNAMIC CANVAS SPATIAL DIAGRAM DEFINITIVES
-                    if (spec.diagramType != "none") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "COSMOLOGICAL VECTOR GRAPHICS ARCHITECTURE",
+                                text = spec.title,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Traditional Dimension: ${spec.ojibweName}",
+                                    fontSize = 12.sp,
+                                    color = ColorEast,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "|  Domain: ${spec.domain}",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            HorizontalDivider(color = Color(0xFF1E1E34))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            if (spec.diagramType != "none") {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "COSMOLOGICAL VECTOR GRAPHICS ARCHITECTURE",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Gray,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                    Text(
+                                        text = "SVG RENDER",
+                                        fontSize = 8.sp,
+                                        color = ColorEast,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(130.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF0F0F15))
+                                        .border(1.dp, Color(0xFF23233E), RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    SpecDiagramRenderer(diagramType = spec.diagramType)
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+
+                            Text(
+                                text = "DESIGN PROSE & LOGICAL BLUEPRINT",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.Gray,
                                 fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(bottom = 6.dp)
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
-                            Text(
-                                text = "SVG RENDER",
-                                fontSize = 8.sp,
-                                color = ColorEast,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(130.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF0F0F15))
-                                .border(1.dp, Color(0xFF23233E), RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            SpecDiagramRenderer(diagramType = spec.diagramType)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
 
-                    Text(
-                        text = "DESIGN PROSE & LOGICAL BLUEPRINT",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-
-                    // Scrollable spec explanation and rich nested sub-domain aspect modules
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        item {
-                            Text(
-                                text = spec.content,
-                                color = Color.LightGray,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp
-                            )
-                        }
-
-                        // ASPECT ACCORDION EXPLORER (Sub-domains)
-                        item {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            HorizontalDivider(color = Color(0xFF1E1E34))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "SUB-DOMAINS & INTERFACE FUNCTIONAL SCHEMAS",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = ColorEast,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
-                        }
-
-                        itemsIndexed(spec.aspects) { aIdx, aspect ->
-                            var expanded by remember { mutableStateOf(false) }
-                            
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF191928)),
-                                border = BorderStroke(1.dp, if (expanded) ColorEast.copy(alpha = 0.4f) else Color(0xFF23233E)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { expanded = !expanded }
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                item {
+                                    Text(
+                                        text = spec.content,
+                                        color = Color.LightGray,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = Color(0xFF1E1E34))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "SUB-DOMAINS & INTERFACE FUNCTIONAL SCHEMAS",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ColorEast,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                }
+
+                                itemsIndexed(spec.aspects) { aIdx, aspect ->
+                                    var expanded by remember { mutableStateOf(false) }
+                                    
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF191928)),
+                                        border = BorderStroke(1.dp, if (expanded) ColorEast.copy(alpha = 0.4f) else Color(0xFF23233E)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { expanded = !expanded }
                                     ) {
-                                        Column {
-                                            Text(
-                                                text = "${selectedSpecIndex + 1}.${aIdx + 1} ${aspect.title}",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White
-                                            )
-                                            Text(
-                                                text = "Ojibwe: ${aspect.ojibweName}",
-                                                fontSize = 10.sp,
-                                                color = Color.Gray
-                                            )
-                                        }
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        text = "${selectedSpecIndex + 1}.${aIdx + 1} ${aspect.title}",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White
+                                                    )
+                                                    Text(
+                                                        text = "Ojibwe: ${aspect.ojibweName}",
+                                                        fontSize = 10.sp,
+                                                        color = Color.Gray
+                                                    )
+                                                }
 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            val aBadgeColor = when (aspect.status) {
-                                                "Implemented" -> Color(0xFF33B3A6)
-                                                "Active Draft" -> ColorEast
-                                                else -> Color(0xFFFF3B30)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    val aBadgeColor = when (aspect.status) {
+                                                        "Implemented" -> Color(0xFF33B3A6)
+                                                        "Active Draft" -> ColorEast
+                                                        else -> Color(0xFFFF3B30)
+                                                    }
+                                                    Text(
+                                                        text = aspect.status,
+                                                        color = aBadgeColor,
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .background(aBadgeColor.copy(alpha = 0.15f))
+                                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                    Icon(
+                                                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = null,
+                                                        tint = Color.Gray,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
                                             }
-                                            Text(
-                                                text = aspect.status,
-                                                color = aBadgeColor,
-                                                fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(aBadgeColor.copy(alpha = 0.15f))
-                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                                            )
-                                            Icon(
-                                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = null,
-                                                tint = Color.Gray,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
 
-                                    AnimatedVisibility(visible = expanded) {
-                                        Column(modifier = Modifier.padding(top = 8.dp)) {
-                                            Text(
-                                                text = aspect.description,
-                                                fontSize = 11.sp,
-                                                color = Color.LightGray,
-                                                lineHeight = 15.sp,
-                                                modifier = Modifier.padding(bottom = 8.dp)
-                                            )
+                                            AnimatedVisibility(visible = expanded) {
+                                                Column(modifier = Modifier.padding(top = 8.dp)) {
+                                                    Text(
+                                                        text = aspect.description,
+                                                        fontSize = 11.sp,
+                                                        color = Color.LightGray,
+                                                        lineHeight = 15.sp,
+                                                        modifier = Modifier.padding(bottom = 8.dp)
+                                                    )
 
-                                            if (aspect.schemaCode.isNotBlank()) {
-                                                Text(
-                                                    text = "STRUCTURED SCHEMA DEFINITION:",
-                                                    fontSize = 8.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.Gray,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    modifier = Modifier.padding(bottom = 2.dp)
-                                                )
-                                                HighlightedCodeView(code = aspect.schemaCode)
+                                                    if (aspect.schemaCode.isNotBlank()) {
+                                                        Text(
+                                                            text = "STRUCTURED SCHEMA DEFINITION:",
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color.Gray,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            modifier = Modifier.padding(bottom = 2.dp)
+                                                        )
+                                                        HighlightedCodeView(code = aspect.schemaCode)
+                                                    }
+                                                }
                                             }
                                         }
                                     }

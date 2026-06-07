@@ -3,6 +3,8 @@ package com.example.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -59,200 +61,401 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
         nodes.find { it.id == selectedNodeId }
     }
 
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F15)), // Slate-midnight deep atmosphere
-        horizontalArrangement = Arrangement.SpaceBetween
+            .background(Color(0xFF0F0F15))
     ) {
-        // Left Column or primary block: the actual interactive wheel representation
-        Box(
-            modifier = Modifier
-                .weight(1.2f)
-                .fillMaxHeight()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Header indicating visual ontology mode
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "RELATIONAL MAP",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ColorEast,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "Circular Spatial Semantics",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                    }
+        val isCompact = maxWidth < 750.dp
 
-                    Row {
-                        IconButton(
-                            onClick = { showAddNodeDialog = true },
-                            modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add Node", tint = Color.Green)
+        if (isCompact) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header item
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "RELATIONAL MAP",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorEast,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Circular Spatial Semantics",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = { showLinkNodesDialog = true },
-                            modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = "Link Nodes", tint = ColorEast)
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconButton(
+                                onClick = { showAddNodeDialog = true },
+                                modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Node", tint = Color.Green)
+                            }
+                            IconButton(
+                                onClick = { showLinkNodesDialog = true },
+                                modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = "Link Nodes", tint = ColorEast)
+                            }
                         }
                     }
                 }
 
-                // Interactive Circle Box
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color(0xFF13131E))
-                        .border(1.dp, Color(0xFF23233E), RoundedCornerShape(24.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // 1. Draw quadrants, axes and legend details on Canvas
-                    MedicineWheelBackgroundCanvas()
-
-                    // 2. Render Graph: We'll compute layouts reactive to box scale.
-                    BoxWithConstraints(
-                        modifier = Modifier.fillMaxSize(),
+                // Interactive Wheel item
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(340.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Color(0xFF13131E))
+                            .border(1.dp, Color(0xFF23233E), RoundedCornerShape(24.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
-                        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
-                        val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
-                        
-                        // Compute positions for active nodes
-                        val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
-                            calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
-                        }
+                        // Background Canvas
+                        MedicineWheelBackgroundCanvas()
 
-                        // Draw lines for edges first (behind nodes)
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            edges.forEach { edge ->
-                                val startPos = nodePositions[edge.fromId]
-                                val endPos = nodePositions[edge.toId]
-                                if (startPos != null && endPos != null) {
-                                    val lineColor = if (edge.ceremonyHonored) ColorEast else Color(0x3DFFFFFF)
-                                    val strokeWidth = if (edge.ceremonyHonored) 4e-1f * density * 8f else 1.5f * density
-                                    
-                                    // Draw connection curve or line
-                                    drawLine(
-                                        color = lineColor,
-                                        start = startPos,
-                                        end = endPos,
-                                        strokeWidth = strokeWidth
-                                    )
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+                            val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+                            val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
+                            
+                            val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
+                                calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
+                            }
+
+                            // Edges Canvas
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                edges.forEach { edge ->
+                                    val startPos = nodePositions[edge.fromId]
+                                    val endPos = nodePositions[edge.toId]
+                                    if (startPos != null && endPos != null) {
+                                        val lineColor = if (edge.ceremonyHonored) ColorEast else Color(0x3DFFFFFF)
+                                        val strokeWidth = if (edge.ceremonyHonored) 4e-1f * density * 8f else 1.5f * density
+                                        drawLine(
+                                            color = lineColor,
+                                            start = startPos,
+                                            end = endPos,
+                                            strokeWidth = strokeWidth
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Nodes
+                            nodePositions.forEach { (nodeId, offset) ->
+                                val node = nodes.find { it.id == nodeId }
+                                if (node != null) {
+                                    val isSelected = node.id == selectedNodeId
+                                    val nodeColor = getDirectionColor(node.direction)
+                                    val dpOffset = with(LocalDensity.current) {
+                                        IntOffset(
+                                            x = (offset.x - 22.dp.toPx()).toInt(),
+                                            y = (offset.y - 22.dp.toPx()).toInt()
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .absoluteOffset(
+                                                x = with(LocalDensity.current) { dpOffset.x.toDp() },
+                                                y = with(LocalDensity.current) { dpOffset.y.toDp() }
+                                            )
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isSelected) Color.White else Color(0xFF1F1F2F))
+                                            .border(
+                                                width = if (isSelected) 3.dp else 2.dp,
+                                                color = nodeColor,
+                                                shape = CircleShape
+                                            )
+                                            .clickable { viewModel.selectNode(node.id) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = getNodeIcon(node.type),
+                                            contentDescription = node.name,
+                                            tint = if (isSelected) Color(0xFF13131E) else Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    val labelOffset = with(LocalDensity.current) {
+                                        IntOffset(
+                                            x = (offset.x - 50.dp.toPx()).toInt(),
+                                            y = (offset.y + 26.dp.toPx()).toInt()
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .absoluteOffset(
+                                                x = with(LocalDensity.current) { labelOffset.x.toDp() },
+                                                y = with(LocalDensity.current) { labelOffset.y.toDp() }
+                                            )
+                                            .width(100.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = node.name,
+                                            color = if (isSelected) Color.White else Color(0xCCFFFFFF),
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
                         }
+                    }
+                }
 
-                        // Render clickable nodes on top of links
-                        nodePositions.forEach { (nodeId, offset) ->
-                            val node = nodes.find { it.id == nodeId }
-                            if (node != null) {
-                                val isSelected = node.id == selectedNodeId
-                                val nodeColor = getDirectionColor(node.direction)
-                                val dpOffset = with(LocalDensity.current) {
-                                    IntOffset(
-                                        x = (offset.x - 22.dp.toPx()).toInt(),
-                                        y = (offset.y - 22.dp.toPx()).toInt()
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .absoluteOffset(
-                                            x = with(LocalDensity.current) { dpOffset.x.toDp() },
-                                            y = with(LocalDensity.current) { dpOffset.y.toDp() }
-                                        )
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isSelected) Color.White else Color(0xFF1F1F2F))
-                                        .border(
-                                            width = if (isSelected) 3.dp else 2.dp,
-                                            color = nodeColor,
-                                            shape = CircleShape
-                                        )
-                                        .clickable { viewModel.selectNode(node.id) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = getNodeIcon(node.type),
-                                        contentDescription = node.name,
-                                        tint = if (isSelected) Color(0xFF13131E) else Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-
-                                // Text label positioned slightly below the node
-                                val labelOffset = with(LocalDensity.current) {
-                                    IntOffset(
-                                        x = (offset.x - 50.dp.toPx()).toInt(),
-                                        y = (offset.y + 26.dp.toPx()).toInt()
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .absoluteOffset(
-                                            x = with(LocalDensity.current) { labelOffset.x.toDp() },
-                                            y = with(LocalDensity.current) { labelOffset.y.toDp() }
-                                        )
-                                        .width(100.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = node.name,
-                                        color = if (isSelected) Color.White else Color(0xCCFFFFFF),
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1
-                                    )
-                                }
+                // Inspector card item (flows downward scrollably)
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF131320)),
+                        border = BorderStroke(1.dp, Color(0xFF1E1E34)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            if (selectedNode != null) {
+                                NodeInspectorPanel(
+                                    node = selectedNode,
+                                    edges = edges,
+                                    allNodes = nodes,
+                                    viewModel = viewModel,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClose = { viewModel.selectNode(null) }
+                                )
+                            } else {
+                                EmptyInspectorPanel(
+                                    nodeCount = nodes.size,
+                                    edgeCount = edges.size,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                                )
                             }
                         }
                     }
                 }
             }
-        }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Left Column or primary block: the actual interactive wheel representation
+                Box(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Header indicating visual ontology mode
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "RELATIONAL MAP",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ColorEast,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "Circular Spatial Semantics",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
 
-        // Right Column: Node Inspector & Obligation audits
-        Box(
-            modifier = Modifier
-                .weight(0.8f)
-                .fillMaxHeight()
-                .background(Color(0xFF131320))
-                .border(1.dp, Color(0xFF1E1E34))
-                .padding(16.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (selectedNode != null) {
-                    NodeInspectorPanel(
-                        node = selectedNode,
-                        edges = edges,
-                        allNodes = nodes,
-                        viewModel = viewModel,
-                        onClose = { viewModel.selectNode(null) }
-                    )
-                } else {
-                    EmptyInspectorPanel(nodes.size, edges.size)
+                            Row {
+                                IconButton(
+                                    onClick = { showAddNodeDialog = true },
+                                    modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Add Node", tint = Color.Green)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = { showLinkNodesDialog = true },
+                                    modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = "Link Nodes", tint = ColorEast)
+                                }
+                            }
+                        }
+
+                        // Interactive Circle Box
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Color(0xFF13131E))
+                                .border(1.dp, Color(0xFF23233E), RoundedCornerShape(24.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // 1. Draw quadrants, axes and legend details on Canvas
+                            MedicineWheelBackgroundCanvas()
+
+                            // 2. Render Graph: We'll compute layouts reactive to box scale.
+                            BoxWithConstraints(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+                                val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+                                val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
+                                
+                                // Compute positions for active nodes
+                                val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
+                                    calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
+                                }
+
+                                // Draw lines for edges first (behind nodes)
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    edges.forEach { edge ->
+                                        val startPos = nodePositions[edge.fromId]
+                                        val endPos = nodePositions[edge.toId]
+                                        if (startPos != null && endPos != null) {
+                                            val lineColor = if (edge.ceremonyHonored) ColorEast else Color(0x3DFFFFFF)
+                                            val strokeWidth = if (edge.ceremonyHonored) 4e-1f * density * 8f else 1.5f * density
+                                            
+                                            // Draw connection curve or line
+                                            drawLine(
+                                                color = lineColor,
+                                                start = startPos,
+                                                end = endPos,
+                                                strokeWidth = strokeWidth
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Render clickable nodes on top of links
+                                nodePositions.forEach { (nodeId, offset) ->
+                                    val node = nodes.find { it.id == nodeId }
+                                    if (node != null) {
+                                        val isSelected = node.id == selectedNodeId
+                                        val nodeColor = getDirectionColor(node.direction)
+                                        val dpOffset = with(LocalDensity.current) {
+                                            IntOffset(
+                                                x = (offset.x - 22.dp.toPx()).toInt(),
+                                                y = (offset.y - 22.dp.toPx()).toInt()
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .absoluteOffset(
+                                                    x = with(LocalDensity.current) { dpOffset.x.toDp() },
+                                                    y = with(LocalDensity.current) { dpOffset.y.toDp() }
+                                                )
+                                                .size(44.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) Color.White else Color(0xFF1F1F2F))
+                                                .border(
+                                                    width = if (isSelected) 3.dp else 2.dp,
+                                                    color = nodeColor,
+                                                    shape = CircleShape
+                                                )
+                                                .clickable { viewModel.selectNode(node.id) },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = getNodeIcon(node.type),
+                                                contentDescription = node.name,
+                                                tint = if (isSelected) Color(0xFF13131E) else Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+
+                                        // Text label positioned slightly below the node
+                                        val labelOffset = with(LocalDensity.current) {
+                                            IntOffset(
+                                                x = (offset.x - 50.dp.toPx()).toInt(),
+                                                y = (offset.y + 26.dp.toPx()).toInt()
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .absoluteOffset(
+                                                    x = with(LocalDensity.current) { labelOffset.x.toDp() },
+                                                    y = with(LocalDensity.current) { labelOffset.y.toDp() }
+                                                )
+                                                .width(100.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = node.name,
+                                                color = if (isSelected) Color.White else Color(0xCCFFFFFF),
+                                                fontSize = 10.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                textAlign = TextAlign.Center,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Right Column: Node Inspector & Obligation audits
+                Box(
+                    modifier = Modifier
+                        .weight(0.8f)
+                        .fillMaxHeight()
+                        .background(Color(0xFF131320))
+                        .border(1.dp, Color(0xFF1E1E34))
+                        .padding(16.dp)
+                ) {
+                    if (selectedNode != null) {
+                        NodeInspectorPanel(
+                            node = selectedNode,
+                            edges = edges,
+                            allNodes = nodes,
+                            viewModel = viewModel,
+                            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                            onClose = { viewModel.selectNode(null) }
+                        )
+                    } else {
+                        EmptyInspectorPanel(
+                            nodeCount = nodes.size,
+                            edgeCount = edges.size,
+                            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        )
+                    }
                 }
             }
         }
@@ -443,234 +646,235 @@ fun NodeInspectorPanel(
     edges: List<RelationalEdge>,
     allNodes: List<RelationalNode>,
     viewModel: MedicineWheelViewModel,
+    modifier: Modifier = Modifier,
     onClose: () -> Unit
 ) {
     val nodeEdges = remember(node.id, edges) {
         edges.filter { it.fromId == node.id || it.toId == node.id }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "INSPECTOR",
-            fontSize = 11.sp,
-            color = ColorEast,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold
-        )
-        IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
-        }
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
-        border = BorderStroke(1.dp, getDirectionColor(node.direction).copy(alpha = 0.5f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(getDirectionColor(node.direction).copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = getNodeIcon(node.type),
-                        contentDescription = "Node type icon",
-                        tint = getDirectionColor(node.direction)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = node.name,
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Type: ${node.type.replaceFirstChar { it.uppercase() }}",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Color(0x33FFFFFF))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(text = "DESCRIPTION & TEACHINGS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = node.description.ifEmpty { "No teachings compiled for this entity yet." },
-                color = Color.White,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(vertical = 4.dp),
-                lineHeight = 18.sp
+                text = "INSPECTOR",
+                fontSize = 11.sp,
+                color = ColorEast,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Color(0x33FFFFFF))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Traditional Alignment Meta Info
-            if (node.direction != null) {
-                Text(text = "DIRECTION SYMBOLS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val info = when(node.direction) {
-                        "east" -> "Waabinong 🌸 Spring (Tobacco)"
-                        "south" -> "Zhaawanong 🔥 Summer (Sage/Cedar)"
-                        "west" -> "Epangishmok 🌊 Autumn (Cedar)"
-                        "north" -> "Kiiwedinong ❄️ Winter (Sweetgrass)"
-                        else -> ""
-                    }
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = getDirectionColor(node.direction), modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = info, color = getDirectionColor(node.direction), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
+            IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
             }
         }
-    }
 
-    Spacer(modifier = Modifier.height(12.dp))
-
-    // OCAP Badge
-    OcapBadge(nodeType = node.type)
-
-    Spacer(modifier = Modifier.height(16.dp))
-
-    // List of connected relationships (edges)
-    Text(
-        text = "RELATIONAL EDGES (${nodeEdges.size})",
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color.Gray,
-        modifier = Modifier.padding(vertical = 4.dp)
-    )
-
-    if (nodeEdges.isEmpty()) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF131320))
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
+            border = BorderStroke(1.dp, getDirectionColor(node.direction).copy(alpha = 0.5f))
         ) {
-            Box(modifier = Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
-                Text(text = "No relationships linked to other circular nodes yet.", color = Color.DarkGray, fontSize = 12.sp)
-            }
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(nodeEdges) { edge ->
-                val currentTargetId = if (edge.fromId == node.id) edge.toId else edge.fromId
-                val targetNode = allNodes.find { it.id == currentTargetId }
-                
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2F)),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (edge.ceremonyHonored) ColorEast.copy(alpha = 0.5f) else Color.Transparent
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = edge.relationshipType,
-                                fontWeight = FontWeight.Bold,
-                                color = if (edge.ceremonyHonored) ColorEast else Color.White,
-                                fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (edge.ceremonyHonored) Icons.Default.CheckCircle else Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = if (edge.ceremonyHonored) ColorEast else Color.Gray,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (edge.ceremonyHonored) "Honored" else "Unceremonied",
-                                    fontSize = 11.sp,
-                                    color = if (edge.ceremonyHonored) ColorEast else Color.Gray
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(getDirectionColor(node.direction).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = getNodeIcon(node.type),
+                            contentDescription = "Node type icon",
+                            tint = getDirectionColor(node.direction)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
                         Text(
-                            text = "Connected to: ${targetNode?.name ?: "Unknown Node"}",
-                            fontSize = 12.sp,
-                            color = Color.LightGray
+                            text = node.name,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Relational strength: ${(edge.strength * 100).toInt()}%",
-                            fontSize = 11.sp,
+                            text = "Type: ${node.type.replaceFirstChar { it.uppercase() }}",
+                            fontSize = 12.sp,
                             color = Color.Gray
                         )
+                    }
+                }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Button(
-                                onClick = { viewModel.honorEdgeWithCeremony(edge.id, "ceremony_custom") },
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (edge.ceremonyHonored) Color(0x33FFD700) else Color(0x1AFFD700)
-                                ),
-                                modifier = Modifier.height(28.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0x33FFFFFF))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(text = "DESCRIPTION & TEACHINGS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                Text(
+                    text = node.description.ifEmpty { "No teachings compiled for this entity yet." },
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0x33FFFFFF))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Traditional Alignment Meta Info
+                if (node.direction != null) {
+                    Text(text = "DIRECTION SYMBOLS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val info = when(node.direction) {
+                            "east" -> "Waabinong 🌸 Spring (Tobacco)"
+                            "south" -> "Zhaawanong 🔥 Summer (Sage/Cedar)"
+                            "west" -> "Epangishmok 🌊 Autumn (Cedar)"
+                            "north" -> "Kiiwedinong ❄️ Winter (Sweetgrass)"
+                            else -> ""
+                        }
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = getDirectionColor(node.direction), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = info, color = getDirectionColor(node.direction), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // OCAP Badge
+        OcapBadge(nodeType = node.type)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // List of connected relationships (edges)
+        Text(
+            text = "RELATIONAL EDGES (${nodeEdges.size})",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray,
+            modifier = Modifier.padding(vertical = 4.dp)
+        )
+
+        if (nodeEdges.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF131320))
+            ) {
+                Box(modifier = Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
+                    Text(text = "No relationships linked to other circular nodes yet.", color = Color.DarkGray, fontSize = 12.sp)
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                nodeEdges.forEach { edge ->
+                    val currentTargetId = if (edge.fromId == node.id) edge.toId else edge.fromId
+                    val targetNode = allNodes.find { it.id == currentTargetId }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2F)),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (edge.ceremonyHonored) ColorEast.copy(alpha = 0.5f) else Color.Transparent
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (edge.ceremonyHonored) "Honor Again" else "Conduct Ceremony",
-                                    fontSize = 10.sp,
-                                    color = ColorEast
+                                    text = edge.relationshipType,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (edge.ceremonyHonored) ColorEast else Color.White,
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace
                                 )
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (edge.ceremonyHonored) Icons.Default.CheckCircle else Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = if (edge.ceremonyHonored) ColorEast else Color.Gray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (edge.ceremonyHonored) "Honored" else "Unceremonied",
+                                        fontSize = 11.sp,
+                                        color = if (edge.ceremonyHonored) ColorEast else Color.Gray
+                                    )
+                                }
                             }
 
-                            Button(
-                                onClick = { viewModel.removeEdge(edge.id) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                                contentPadding = PaddingValues(horizontal = 8.dp),
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete Link", tint = Color.Red, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Sever", color = Color.Red, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Connected to: ${targetNode?.name ?: "Unknown Node"}",
+                                fontSize = 12.sp,
+                                color = Color.LightGray
+                            )
+                            Text(
+                                text = "Relational strength: ${(edge.strength * 100).toInt()}%",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Button(
+                                    onClick = { viewModel.honorEdgeWithCeremony(edge.id, "ceremony_custom") },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (edge.ceremonyHonored) Color(0x33FFD700) else Color(0x1AFFD700)
+                                    ),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = if (edge.ceremonyHonored) "Honor Again" else "Conduct Ceremony",
+                                        fontSize = 10.sp,
+                                        color = ColorEast
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { viewModel.removeEdge(edge.id) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete Link", tint = Color.Red, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Sever", color = Color.Red, fontSize = 11.sp)
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-    // Big delete node action
-    Button(
-        onClick = { viewModel.removeNode(node.id) },
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0x22DC143C)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ColorSouth)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Dissolve Node from Wheel", color = ColorSouth, fontWeight = FontWeight.SemiBold)
-    }
+        // Big delete node action
+        Button(
+            onClick = { viewModel.removeNode(node.id) },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0x22DC143C)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ColorSouth)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Dissolve Node from Wheel", color = ColorSouth, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -715,9 +919,13 @@ fun OcapBadge(nodeType: String) {
 }
 
 @Composable
-fun EmptyInspectorPanel(nodeCount: Int, edgeCount: Int) {
+fun EmptyInspectorPanel(
+    nodeCount: Int,
+    edgeCount: Int,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
