@@ -91,6 +91,55 @@ class MedicineWheelViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun updateNodePosition(id: String, xOffset: Float, yOffset: Float) {
+        viewModelScope.launch {
+            val allNodesList = nodes.value
+            val node = allNodesList.find { it.id == id }
+            if (node != null) {
+                repository.insertNode(node.copy(xOffset = xOffset, yOffset = yOffset, updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
+    fun resetNodePosition(id: String) {
+        viewModelScope.launch {
+            val allNodesList = nodes.value
+            val node = allNodesList.find { it.id == id }
+            if (node != null) {
+                repository.insertNode(node.copy(xOffset = 0f, yOffset = 0f, updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
+    fun resetAllNodePositions() {
+        viewModelScope.launch {
+            val allNodesList = nodes.value
+            for (node in allNodesList) {
+                if (node.xOffset != 0f || node.yOffset != 0f) {
+                    repository.insertNode(node.copy(xOffset = 0f, yOffset = 0f, updatedAt = System.currentTimeMillis()))
+                }
+            }
+        }
+    }
+
+    fun updateNodeDetails(id: String, name: String, type: String, direction: String?, description: String) {
+        viewModelScope.launch {
+            val allNodesList = nodes.value
+            val node = allNodesList.find { it.id == id }
+            if (node != null) {
+                repository.insertNode(
+                    node.copy(
+                        name = name,
+                        type = type,
+                        direction = direction,
+                        description = description,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+
     fun removeNode(id: String) {
         viewModelScope.launch {
             if (_selectedNodeId.value == id) {

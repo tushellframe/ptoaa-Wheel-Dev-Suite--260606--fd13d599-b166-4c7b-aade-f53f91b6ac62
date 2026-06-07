@@ -35,11 +35,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import com.example.data.RelationalEdge
 import com.example.data.RelationalNode
 import com.example.viewmodel.MedicineWheelViewModel
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.atan2
+import kotlin.math.abs
 
 // Direction Colors Matching standard specs
 val ColorEast = Color(0xFFFFD700)   // Gold / Yellow
@@ -55,11 +68,24 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
     val selectedNodeId by viewModel.selectedNodeId.collectAsState()
     
     var showAddNodeDialog by remember { mutableStateOf(false) }
+    var preselectedAddDirection by remember { mutableStateOf<String?>("east") }
     var showLinkNodesDialog by remember { mutableStateOf(false) }
     var activeEdgeForCeremony by remember { mutableStateOf<RelationalEdge?>(null) }
+    var linkingFromNodeId by remember { mutableStateOf<String?>(null) }
+    var prefilledLinkToNodeId by remember { mutableStateOf<String?>(null) }
 
     val selectedNode = remember(selectedNodeId, nodes) {
         nodes.find { it.id == selectedNodeId }
+    }
+
+    val dragOffsets = remember { mutableStateMapOf<String, Offset>() }
+
+    LaunchedEffect(nodes) {
+        nodes.forEach { node ->
+            if (node.xOffset == 0f && node.yOffset == 0f) {
+                dragOffsets.remove(node.id)
+            }
+        }
     }
 
     BoxWithConstraints(
@@ -101,7 +127,16 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             IconButton(
-                                onClick = { showAddNodeDialog = true },
+                                onClick = { viewModel.resetAllNodePositions() },
+                                modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Align Layout", tint = Color.Cyan)
+                            }
+                            IconButton(
+                                onClick = { 
+                                    preselectedAddDirection = "east"
+                                    showAddNodeDialog = true 
+                                },
                                 modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = "Add Node", tint = Color.Green)
@@ -118,114 +153,27 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
 
                 // Interactive Wheel item
                 item {
-                    Box(
+                    MedicineWheelGraph(
+                        nodes = nodes,
+                        edges = edges,
+                        selectedNodeId = selectedNodeId,
+                        viewModel = viewModel,
+                        dragOffsets = dragOffsets,
+                        linkingFromNodeId = linkingFromNodeId,
+                        onStartLink = { linkingFromNodeId = it },
+                        onCancelLink = { linkingFromNodeId = null },
+                        onSelectToLink = { toId ->
+                            prefilledLinkToNodeId = toId
+                            showLinkNodesDialog = true
+                        },
+                        onDoubleTap = { dir ->
+                            preselectedAddDirection = dir
+                            showAddNodeDialog = true
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(340.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Color(0xFF13131E))
-                            .border(1.dp, Color(0xFF23233E), RoundedCornerShape(24.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Background Canvas
-                        MedicineWheelBackgroundCanvas()
-
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
-                            val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
-                            val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
-                            
-                            val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
-                                calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
-                            }
-
-                            // Edges Canvas
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                edges.forEach { edge ->
-                                    val startPos = nodePositions[edge.fromId]
-                                    val endPos = nodePositions[edge.toId]
-                                    if (startPos != null && endPos != null) {
-                                        val lineColor = if (edge.ceremonyHonored) ColorEast else Color(0x3DFFFFFF)
-                                        val strokeWidth = if (edge.ceremonyHonored) 4e-1f * density * 8f else 1.5f * density
-                                        drawLine(
-                                            color = lineColor,
-                                            start = startPos,
-                                            end = endPos,
-                                            strokeWidth = strokeWidth
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Nodes
-                            nodePositions.forEach { (nodeId, offset) ->
-                                val node = nodes.find { it.id == nodeId }
-                                if (node != null) {
-                                    val isSelected = node.id == selectedNodeId
-                                    val nodeColor = getDirectionColor(node.direction)
-                                    val dpOffset = with(LocalDensity.current) {
-                                        IntOffset(
-                                            x = (offset.x - 22.dp.toPx()).toInt(),
-                                            y = (offset.y - 22.dp.toPx()).toInt()
-                                        )
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .absoluteOffset(
-                                                x = with(LocalDensity.current) { dpOffset.x.toDp() },
-                                                y = with(LocalDensity.current) { dpOffset.y.toDp() }
-                                            )
-                                            .size(44.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isSelected) Color.White else Color(0xFF1F1F2F))
-                                            .border(
-                                                width = if (isSelected) 3.dp else 2.dp,
-                                                color = nodeColor,
-                                                shape = CircleShape
-                                            )
-                                            .clickable { viewModel.selectNode(node.id) },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = getNodeIcon(node.type),
-                                            contentDescription = node.name,
-                                            tint = if (isSelected) Color(0xFF13131E) else Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-
-                                    val labelOffset = with(LocalDensity.current) {
-                                        IntOffset(
-                                            x = (offset.x - 50.dp.toPx()).toInt(),
-                                            y = (offset.y + 26.dp.toPx()).toInt()
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .absoluteOffset(
-                                                x = with(LocalDensity.current) { labelOffset.x.toDp() },
-                                                y = with(LocalDensity.current) { labelOffset.y.toDp() }
-                                            )
-                                            .width(100.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = node.name,
-                                            color = if (isSelected) Color.White else Color(0xCCFFFFFF),
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    )
                 }
 
                 // Inspector card item (flows downward scrollably)
@@ -299,14 +247,22 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                                 )
                             }
 
-                            Row {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 IconButton(
-                                    onClick = { showAddNodeDialog = true },
+                                    onClick = { viewModel.resetAllNodePositions() },
+                                    modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Align Layout", tint = Color.Cyan)
+                                }
+                                IconButton(
+                                    onClick = { 
+                                        preselectedAddDirection = "east"
+                                        showAddNodeDialog = true 
+                                    },
                                     modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = "Add Node", tint = Color.Green)
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
                                 IconButton(
                                     onClick = { showLinkNodesDialog = true },
                                     modifier = Modifier.background(Color(0xFF1E1E2A), CircleShape).size(38.dp)
@@ -317,119 +273,27 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                         }
 
                         // Interactive Circle Box
-                        Box(
+                        MedicineWheelGraph(
+                            nodes = nodes,
+                            edges = edges,
+                            selectedNodeId = selectedNodeId,
+                            viewModel = viewModel,
+                            dragOffsets = dragOffsets,
+                            linkingFromNodeId = linkingFromNodeId,
+                            onStartLink = { linkingFromNodeId = it },
+                            onCancelLink = { linkingFromNodeId = null },
+                            onSelectToLink = { toId ->
+                                prefilledLinkToNodeId = toId
+                                showLinkNodesDialog = true
+                            },
+                            onDoubleTap = { dir ->
+                                preselectedAddDirection = dir
+                                showAddNodeDialog = true
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color(0xFF13131E))
-                                .border(1.dp, Color(0xFF23233E), RoundedCornerShape(24.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // 1. Draw quadrants, axes and legend details on Canvas
-                            MedicineWheelBackgroundCanvas()
-
-                            // 2. Render Graph: We'll compute layouts reactive to box scale.
-                            BoxWithConstraints(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
-                                val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
-                                val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
-                                
-                                // Compute positions for active nodes
-                                val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
-                                    calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
-                                }
-
-                                // Draw lines for edges first (behind nodes)
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    edges.forEach { edge ->
-                                        val startPos = nodePositions[edge.fromId]
-                                        val endPos = nodePositions[edge.toId]
-                                        if (startPos != null && endPos != null) {
-                                            val lineColor = if (edge.ceremonyHonored) ColorEast else Color(0x3DFFFFFF)
-                                            val strokeWidth = if (edge.ceremonyHonored) 4e-1f * density * 8f else 1.5f * density
-                                            
-                                            // Draw connection curve or line
-                                            drawLine(
-                                                color = lineColor,
-                                                start = startPos,
-                                                end = endPos,
-                                                strokeWidth = strokeWidth
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Render clickable nodes on top of links
-                                nodePositions.forEach { (nodeId, offset) ->
-                                    val node = nodes.find { it.id == nodeId }
-                                    if (node != null) {
-                                        val isSelected = node.id == selectedNodeId
-                                        val nodeColor = getDirectionColor(node.direction)
-                                        val dpOffset = with(LocalDensity.current) {
-                                            IntOffset(
-                                                x = (offset.x - 22.dp.toPx()).toInt(),
-                                                y = (offset.y - 22.dp.toPx()).toInt()
-                                            )
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .absoluteOffset(
-                                                    x = with(LocalDensity.current) { dpOffset.x.toDp() },
-                                                    y = with(LocalDensity.current) { dpOffset.y.toDp() }
-                                                )
-                                                .size(44.dp)
-                                                .clip(CircleShape)
-                                                .background(if (isSelected) Color.White else Color(0xFF1F1F2F))
-                                                .border(
-                                                    width = if (isSelected) 3.dp else 2.dp,
-                                                    color = nodeColor,
-                                                    shape = CircleShape
-                                                )
-                                                .clickable { viewModel.selectNode(node.id) },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = getNodeIcon(node.type),
-                                                contentDescription = node.name,
-                                                tint = if (isSelected) Color(0xFF13131E) else Color.White,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-
-                                        // Text label positioned slightly below the node
-                                        val labelOffset = with(LocalDensity.current) {
-                                            IntOffset(
-                                                x = (offset.x - 50.dp.toPx()).toInt(),
-                                                y = (offset.y + 26.dp.toPx()).toInt()
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .absoluteOffset(
-                                                    x = with(LocalDensity.current) { labelOffset.x.toDp() },
-                                                    y = with(LocalDensity.current) { labelOffset.y.toDp() }
-                                                )
-                                                .width(100.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = node.name,
-                                                color = if (isSelected) Color.White else Color(0xCCFFFFFF),
-                                                fontSize = 10.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
 
@@ -467,6 +331,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
     // Dialogs
     if (showAddNodeDialog) {
         AddNodeDialog(
+            initialDirection = preselectedAddDirection,
             onDismiss = { showAddNodeDialog = false },
             onSave = { name, type, direction, desc ->
                 viewModel.addNode(name, type, direction, desc)
@@ -478,10 +343,18 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
     if (showLinkNodesDialog) {
         LinkNodesDialog(
             nodes = nodes,
-            onDismiss = { showLinkNodesDialog = false },
+            initialFromId = linkingFromNodeId,
+            initialToId = prefilledLinkToNodeId,
+            onDismiss = { 
+                showLinkNodesDialog = false
+                linkingFromNodeId = null
+                prefilledLinkToNodeId = null
+            },
             onLink = { fromId, toId, type, strength ->
                 viewModel.linkNodes(fromId, toId, type, strength)
                 showLinkNodesDialog = false
+                linkingFromNodeId = null
+                prefilledLinkToNodeId = null
             }
         )
     }
@@ -505,6 +378,401 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                 activeEdgeForCeremony = null
             }
         )
+    }
+}
+
+@Composable
+fun MedicineWheelGraph(
+    nodes: List<RelationalNode>,
+    edges: List<RelationalEdge>,
+    selectedNodeId: String?,
+    viewModel: MedicineWheelViewModel,
+    dragOffsets: SnapshotStateMap<String, Offset>,
+    linkingFromNodeId: String?,
+    onStartLink: (String) -> Unit,
+    onCancelLink: () -> Unit,
+    onSelectToLink: (String) -> Unit,
+    onDoubleTap: (String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFF13131E))
+            .border(1.dp, Color(0xFF23233E), RoundedCornerShape(24.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        // Background Canvas
+        MedicineWheelBackgroundCanvas()
+
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+            val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+            val radiusPx = (widthPx.coerceAtMost(heightPx) / 2f) * 0.65f
+            
+            val nodePositions = remember(nodes, widthPx, heightPx, radiusPx) {
+                calculateNodeLayout(nodes, widthPx / 2f, heightPx / 2f, radiusPx)
+            }
+
+            val finalNodePositions = remember(nodes, nodePositions, dragOffsets) {
+                nodes.associate { node ->
+                    val basePos = nodePositions[node.id] ?: Offset(widthPx / 2f, heightPx / 2f)
+                    val activeOffset = dragOffsets[node.id] ?: Offset(node.xOffset, node.yOffset)
+                    node.id to Offset(basePos.x + activeOffset.x, basePos.y + activeOffset.y)
+                }
+            }
+
+            // Invisible gesture background to handle double taps on empty space to Quick-Add
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(widthPx, heightPx) {
+                        detectTapGestures(
+                            onDoubleTap = { offset ->
+                                val cx = widthPx / 2f
+                                val cy = heightPx / 2f
+                                val dx = offset.x - cx
+                                val dy = offset.y - cy
+                                val angle = atan2(dy, dx)
+                                val dir = when {
+                                    abs(angle) <= Math.PI.toFloat() / 4f -> "east"
+                                    angle > Math.PI.toFloat() / 4f && angle <= 3f * Math.PI.toFloat() / 4f -> "south"
+                                    angle < -Math.PI.toFloat() / 4f && angle >= -3f * Math.PI.toFloat() / 4f -> "north"
+                                    else -> "west"
+                                }
+                                onDoubleTap(dir)
+                            },
+                            onTap = {
+                                viewModel.selectNode("")
+                            }
+                        )
+                    }
+            )
+
+            // Edges Canvas
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                edges.forEach { edge ->
+                    val startPos = finalNodePositions[edge.fromId]
+                    val endPos = finalNodePositions[edge.toId]
+                    if (startPos != null && endPos != null) {
+                        val isHighlighted = edge.fromId == linkingFromNodeId || edge.toId == linkingFromNodeId
+                        val lineColor = if (edge.ceremonyHonored) {
+                            ColorEast
+                        } else if (isHighlighted) {
+                            Color(0xFF00FFCC)
+                        } else {
+                            Color(0x55FFFFFF)
+                        }
+                        
+                        val strokeWidth = if (edge.ceremonyHonored) {
+                            4e-1f * density * 8f 
+                        } else if (isHighlighted) {
+                            2.5f * density
+                        } else {
+                            1.5f * density
+                        }
+                        
+                        drawLine(
+                            color = lineColor,
+                            start = startPos,
+                            end = endPos,
+                            strokeWidth = strokeWidth
+                        )
+
+                        // Draw ceremonial beads on relations to celebrate connections
+                        val midX = (startPos.x + endPos.x) / 2f
+                        val midY = (startPos.y + endPos.y) / 2f
+                        val midPoint = Offset(midX, midY)
+                        
+                        val outerBeadColor = if (edge.ceremonyHonored) ColorEast else getDirectionColor(nodes.find { it.id == edge.fromId }?.direction)
+                        drawCircle(
+                            color = outerBeadColor,
+                            radius = 5.5f * density,
+                            center = midPoint
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 2.5f * density,
+                            center = midPoint
+                        )
+                    }
+                }
+            }
+
+            // Nodes
+            finalNodePositions.forEach { (nodeId, offset) ->
+                val node = nodes.find { it.id == nodeId }
+                if (node != null) {
+                    val isSelected = node.id == selectedNodeId
+                    val isLinkingSrc = node.id == linkingFromNodeId
+                    val nodeColor = getDirectionColor(node.direction)
+                    val dpOffset = with(LocalDensity.current) {
+                        IntOffset(
+                            x = (offset.x - 22.dp.toPx()).toInt(),
+                            y = (offset.y - 22.dp.toPx()).toInt()
+                        )
+                    }
+
+                    if (isLinkingSrc) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .absoluteOffset(
+                                    x = with(LocalDensity.current) { dpOffset.x.toDp() - 6.dp },
+                                    y = with(LocalDensity.current) { dpOffset.y.toDp() - 6.dp }
+                                )
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(ColorEast.copy(alpha = 0.25f * (2f - pulseScale)))
+                                .border(1.dp, ColorEast.copy(alpha = 0.4f), CircleShape)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .absoluteOffset(
+                                x = with(LocalDensity.current) { dpOffset.x.toDp() },
+                                y = with(LocalDensity.current) { dpOffset.y.toDp() }
+                            )
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) Color.White else Color(0xFF1F1F2F))
+                            .border(
+                                width = if (isSelected) 3.dp else 2.dp,
+                                color = if (isLinkingSrc) ColorEast else nodeColor,
+                                shape = CircleShape
+                            )
+                            .pointerInput(node.id) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        if (linkingFromNodeId == null) {
+                                            viewModel.selectNode(node.id)
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        val finalOffsetVal = dragOffsets[node.id] ?: Offset(node.xOffset, node.yOffset)
+                                        viewModel.updateNodePosition(node.id, finalOffsetVal.x, finalOffsetVal.y)
+                                    },
+                                    onDragCancel = {
+                                        val finalOffsetVal = dragOffsets[node.id] ?: Offset(node.xOffset, node.yOffset)
+                                        viewModel.updateNodePosition(node.id, finalOffsetVal.x, finalOffsetVal.y)
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val oldOffset = dragOffsets[node.id] ?: Offset(node.xOffset, node.yOffset)
+                                        dragOffsets[node.id] = oldOffset + dragAmount
+                                    }
+                                )
+                            }
+                            .clickable {
+                                val currentLinkingFrom = linkingFromNodeId
+                                if (currentLinkingFrom != null) {
+                                    if (currentLinkingFrom != node.id) {
+                                        onSelectToLink(node.id)
+                                    } else {
+                                        viewModel.selectNode(node.id)
+                                    }
+                                } else {
+                                    viewModel.selectNode(node.id)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = getNodeIcon(node.type),
+                            contentDescription = node.name,
+                            tint = if (isSelected) Color(0xFF13131E) else Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    val labelOffset = with(LocalDensity.current) {
+                        IntOffset(
+                            x = (offset.x - 50.dp.toPx()).toInt(),
+                            y = (offset.y + 26.dp.toPx()).toInt()
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .absoluteOffset(
+                                x = with(LocalDensity.current) { labelOffset.x.toDp() },
+                                y = with(LocalDensity.current) { labelOffset.y.toDp() }
+                            )
+                            .width(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = node.name,
+                            color = if (isSelected) Color.White else Color(0xCCFFFFFF),
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        // Weaving kinship banner overlay
+        if (linkingFromNodeId != null) {
+            val sourceNode = nodes.find { it.id == linkingFromNodeId }
+            if (sourceNode != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(12.dp)
+                        .background(Color(0xE60F0F1A), RoundedCornerShape(12.dp))
+                        .border(1.dp, ColorEast.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .fillMaxWidth(0.9f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "WEAVING KINSHIP THREAD",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ColorEast,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Select any other entity to link from ${sourceNode.name}",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(
+                            onClick = onCancelLink,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel linking",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Float selection card HUD
+        if (linkingFromNodeId == null && selectedNodeId != null) {
+            val selected = nodes.find { it.id == selectedNodeId }
+            if (selected != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .background(Color(0xEE0F0F15), RoundedCornerShape(12.dp))
+                        .border(1.dp, getDirectionColor(selected.direction).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                        .widthIn(max = 220.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(getDirectionColor(selected.direction).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = getNodeIcon(selected.type),
+                                    contentDescription = null,
+                                    tint = getDirectionColor(selected.direction),
+                                    modifier = Modifier.size(10.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = selected.name,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Text(
+                            text = "Direction: ${selected.direction?.uppercase() ?: "CENTER"}",
+                            color = getDirectionColor(selected.direction),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = { onStartLink(selected.id) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ColorEast.copy(alpha = 0.22f),
+                                    contentColor = ColorEast
+                                ),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(24.dp).weight(1.1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share, 
+                                    contentDescription = "Weave link", 
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("WEAVE", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                            
+                            Spacer(modifier = Modifier.width(6.dp))
+                            
+                            IconButton(
+                                onClick = { viewModel.resetNodePosition(selected.id) },
+                                modifier = Modifier.size(24.dp).background(Color(0xFF1E1E2A), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Reset offset",
+                                    tint = Color.Cyan,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -752,6 +1020,12 @@ fun NodeInspectorPanel(
         edges.filter { it.fromId == node.id || it.toId == node.id }
     }
 
+    var isEditing by remember(node.id) { mutableStateOf(false) }
+    var editName by remember(node.id) { mutableStateOf(node.name) }
+    var editDescription by remember(node.id) { mutableStateOf(node.description) }
+    var editType by remember(node.id) { mutableStateOf(node.type) }
+    var editDirection by remember(node.id) { mutableStateOf(node.direction) }
+
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -775,70 +1049,248 @@ fun NodeInspectorPanel(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
-            border = BorderStroke(1.dp, getDirectionColor(node.direction).copy(alpha = 0.5f))
+            border = BorderStroke(1.dp, getDirectionColor(editDirection).copy(alpha = 0.5f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(getDirectionColor(node.direction).copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+                if (isEditing) {
+                    Text(
+                        text = "EDIT NODE RELATION",
+                        fontSize = 11.sp,
+                        color = ColorEast,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Name", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ColorEast,
+                            unfocusedBorderColor = Color(0xFF23233E),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = editDescription,
+                        onValueChange = { editDescription = it },
+                        label = { Text("Teachings / Description", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ColorEast,
+                            unfocusedBorderColor = Color(0xFF23233E),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 4
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(text = "CLASSIFICATION TYPE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    val typeOptions = listOf("human", "land", "spirit", "ancestor", "future", "knowledge")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = getNodeIcon(node.type),
-                            contentDescription = "Node type icon",
-                            tint = getDirectionColor(node.direction)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = node.name,
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Type: ${node.type.replaceFirstChar { it.uppercase() }}",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0x33FFFFFF))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(text = "DESCRIPTION & TEACHINGS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                Text(
-                    text = node.description.ifEmpty { "No teachings compiled for this entity yet." },
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0x33FFFFFF))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Traditional Alignment Meta Info
-                if (node.direction != null) {
-                    Text(text = "DIRECTION SYMBOLS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        val info = when(node.direction) {
-                            "east" -> "Waabinong 🌸 Spring (Tobacco)"
-                            "south" -> "Zhaawanong 🔥 Summer (Sage/Cedar)"
-                            "west" -> "Epangishmok 🌊 Autumn (Cedar)"
-                            "north" -> "Kiiwedinong ❄️ Winter (Sweetgrass)"
-                            else -> ""
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(typeOptions) { typeOpt ->
+                                val selected = editType == typeOpt
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { editType = typeOpt },
+                                    label = { Text(typeOpt, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = ColorEast.copy(alpha = 0.2f),
+                                        selectedLabelColor = ColorEast,
+                                        containerColor = Color(0xFF131320),
+                                        labelColor = Color.Gray
+                                    )
+                                )
+                            }
                         }
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = getDirectionColor(node.direction), modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = info, color = getDirectionColor(node.direction), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(text = "QUADRANT DIRECTION", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    val directions = listOf(
+                        "east" to "East 🌸",
+                        "south" to "South 🔥",
+                        "west" to "West 🌊",
+                        "north" to "North ❄️",
+                        null to "Center 🌀"
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(directions) { (dirVal, title) ->
+                            val selected = editDirection == dirVal
+                            FilterChip(
+                                selected = selected,
+                                onClick = { editDirection = dirVal },
+                                label = { Text(title, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = getDirectionColor(dirVal).copy(alpha = 0.2f),
+                                    selectedLabelColor = getDirectionColor(dirVal),
+                                    containerColor = Color(0xFF131320),
+                                    labelColor = Color.Gray
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.updateNodeDetails(node.id, editName, editType, editDirection, editDescription)
+                                isEditing = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ColorEast, contentColor = Color(0xFF13131E)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = "Save")
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("SAVE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                editName = node.name
+                                editDescription = node.description
+                                editType = node.type
+                                editDirection = node.direction
+                                isEditing = false
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, Color(0xFF23233E)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("CANCEL", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(getDirectionColor(node.direction).copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = getNodeIcon(node.type),
+                                contentDescription = "Node type icon",
+                                tint = getDirectionColor(node.direction)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = node.name,
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Type: ${node.type.replaceFirstChar { it.uppercase() }}",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = Color(0x33FFFFFF))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(text = "DESCRIPTION & TEACHINGS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = node.description.ifEmpty { "No teachings compiled for this entity yet." },
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = Color(0x33FFFFFF))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Traditional Alignment Meta Info
+                    if (node.direction != null) {
+                        Text(text = "DIRECTION SYMBOLS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val info = when(node.direction) {
+                                "east" -> "Waabinong 🌸 Spring (Tobacco)"
+                                "south" -> "Zhaawanong 🔥 Summer (Sage/Cedar)"
+                                "west" -> "Epangishmok 🌊 Autumn (Cedar)"
+                                "north" -> "Kiiwedinong ❄️ Winter (Sweetgrass)"
+                                else -> ""
+                            }
+                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = getDirectionColor(node.direction), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = info, color = getDirectionColor(node.direction), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = Color(0x33FFFFFF))
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { isEditing = true },
+                            colors = ButtonDefaults.textButtonColors(contentColor = ColorEast),
+                            modifier = Modifier.weight(1.1f)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit details", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("EDIT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        if (node.xOffset != 0f || node.yOffset != 0f) {
+                            TextButton(
+                                onClick = { viewModel.resetNodePosition(node.id) },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.Cyan),
+                                modifier = Modifier.weight(1.3f)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Align node", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("REALIGN", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        TextButton(
+                            onClick = { viewModel.removeNode(node.id) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFDC143C)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete node", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("DELETE", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -1082,13 +1534,14 @@ fun EmptyInspectorPanel(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddNodeDialog(
+    initialDirection: String? = "east",
     onDismiss: () -> Unit,
     onSave: (name: String, type: String, direction: String?, description: String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("human") }
-    var direction by remember { mutableStateOf<String?>("east") }
+    var direction by remember { mutableStateOf<String?>(initialDirection) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1186,6 +1639,8 @@ fun AddNodeDialog(
 @Composable
 fun LinkNodesDialog(
     nodes: List<RelationalNode>,
+    initialFromId: String? = null,
+    initialToId: String? = null,
     onDismiss: () -> Unit,
     onLink: (fromId: String, toId: String, type: String, strength: Float) -> Unit
 ) {
@@ -1200,8 +1655,14 @@ fun LinkNodesDialog(
         return
     }
 
-    var fromIndex by remember { mutableIntStateOf(0) }
-    var toIndex by remember { mutableIntStateOf(1) }
+    var fromIndex by remember { 
+        val findIdx = nodes.indexOfFirst { it.id == initialFromId }
+        mutableIntStateOf(if (findIdx != -1) findIdx else 0) 
+    }
+    var toIndex by remember { 
+        val findIdx = nodes.indexOfFirst { it.id == initialToId }
+        mutableIntStateOf(if (findIdx != -1) findIdx else if (fromIndex == 0) 1 else 0) 
+    }
     var relationshipType by remember { mutableStateOf("SERVES") }
     var strength by remember { mutableFloatStateOf(0.85f) }
 

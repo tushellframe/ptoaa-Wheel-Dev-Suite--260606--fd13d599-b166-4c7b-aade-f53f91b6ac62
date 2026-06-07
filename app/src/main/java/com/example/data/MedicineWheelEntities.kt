@@ -11,7 +11,9 @@ data class RelationalNode(
     val direction: String?, // east, south, west, north
     val description: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val xOffset: Float = 0f,
+    val yOffset: Float = 0f
 )
 
 @Entity(tableName = "edges")
