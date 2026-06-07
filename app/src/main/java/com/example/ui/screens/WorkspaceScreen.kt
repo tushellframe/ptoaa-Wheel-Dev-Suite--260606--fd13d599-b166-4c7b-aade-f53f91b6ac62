@@ -56,6 +56,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
     
     var showAddNodeDialog by remember { mutableStateOf(false) }
     var showLinkNodesDialog by remember { mutableStateOf(false) }
+    var activeEdgeForCeremony by remember { mutableStateOf<RelationalEdge?>(null) }
 
     val selectedNode = remember(selectedNodeId, nodes) {
         nodes.find { it.id == selectedNodeId }
@@ -245,6 +246,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                                     allNodes = nodes,
                                     viewModel = viewModel,
                                     modifier = Modifier.fillMaxWidth(),
+                                    onConductCeremony = { activeEdgeForCeremony = it },
                                     onClose = { viewModel.selectNode(null) }
                                 )
                             } else {
@@ -447,6 +449,7 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
                             allNodes = nodes,
                             viewModel = viewModel,
                             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                            onConductCeremony = { activeEdgeForCeremony = it },
                             onClose = { viewModel.selectNode(null) }
                         )
                     } else {
@@ -482,92 +485,187 @@ fun WorkspaceScreen(viewModel: MedicineWheelViewModel, modifier: Modifier = Modi
             }
         )
     }
+
+    activeEdgeForCeremony?.let { edge ->
+        ConductCeremonyDialog(
+            edge = edge,
+            allNodes = nodes,
+            onDismiss = { activeEdgeForCeremony = null },
+            onConduct = { type, direction, participants, medicines, intentions, context, ceremonyId ->
+                viewModel.logCeremony(
+                    type = type,
+                    direction = direction,
+                    participants = participants,
+                    medicines = medicines,
+                    intentions = intentions,
+                    context = context,
+                    id = ceremonyId
+                )
+                viewModel.honorEdgeWithCeremony(edge.id, ceremonyId)
+                activeEdgeForCeremony = null
+            }
+        )
+    }
 }
 
 @Composable
 fun MedicineWheelBackgroundCanvas() {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val halfMinDim = size.width.coerceAtMost(size.height) / 2f
-        val outerRadius = halfMinDim * 0.85f
-        val innerCircleRadius = halfMinDim * 0.2f
+    Box(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val halfMinDim = size.width.coerceAtMost(size.height) / 2f
+            val outerRadius = halfMinDim * 0.85f
+            val innerCircleRadius = halfMinDim * 0.2f
 
-        // Draw structural circle indicators
-        drawCircle(
-            color = Color(0x1AFFFFFF),
-            radius = outerRadius,
-            center = Offset(cx, cy),
-            style = Stroke(width = 1.5f)
-        )
-        drawCircle(
-            color = Color(0x0DFFFFFF),
-            radius = halfMinDim * 0.5f,
-            center = Offset(cx, cy),
-            style = Stroke(width = 1.5f)
-        )
-        drawCircle(
-            color = Color(0x33FFFFFF),
-            radius = innerCircleRadius,
-            center = Offset(cx, cy),
-            style = Stroke(width = 2f)
-        )
+            // Draw structural circle indicators
+            drawCircle(
+                color = Color(0x1AFFFFFF),
+                radius = outerRadius,
+                center = Offset(cx, cy),
+                style = Stroke(width = 1.5f)
+            )
+            drawCircle(
+                color = Color(0x0DFFFFFF),
+                radius = halfMinDim * 0.5f,
+                center = Offset(cx, cy),
+                style = Stroke(width = 1.5f)
+            )
+            drawCircle(
+                color = Color(0x33FFFFFF),
+                radius = innerCircleRadius,
+                center = Offset(cx, cy),
+                style = Stroke(width = 2f)
+            )
 
-        // Draw horizontal/vertical lines representing axes (dividing the quadrants)
-        drawLine(
-            color = Color(0x1F23233E),
-            start = Offset(cx - outerRadius, cy),
-            end = Offset(cx + outerRadius, cy),
-            strokeWidth = 2f
-        )
-        drawLine(
-            color = Color(0x1F23233E),
-            start = Offset(cx, cy - outerRadius),
-            end = Offset(cx, cy + outerRadius),
-            strokeWidth = 2f
-        )
-        
-        // Draw directional quadrant indicator slices (subtle glow)
-        // East Slice: 315 to 45
-        drawArc(
-            color = ColorEast,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = true,
-            alpha = 0.04f,
-            size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
-            topLeft = Offset(cx - outerRadius, cy - outerRadius)
-        )
-        // South Slice: 45 to 135
-        drawArc(
-            color = ColorSouth,
-            startAngle = 45f,
-            sweepAngle = 90f,
-            useCenter = true,
-            alpha = 0.04f,
-            size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
-            topLeft = Offset(cx - outerRadius, cy - outerRadius)
-        )
-        // West Slice: 135 to 225
-        drawArc(
-            color = ColorWest,
-            startAngle = 135f,
-            sweepAngle = 90f,
-            useCenter = true,
-            alpha = 0.04f,
-            size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
-            topLeft = Offset(cx - outerRadius, cy - outerRadius)
-        )
-        // North Slice: 225 to 315
-        drawArc(
-            color = ColorNorth,
-            startAngle = 225f,
-            sweepAngle = 90f,
-            useCenter = true,
-            alpha = 0.04f,
-            size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
-            topLeft = Offset(cx - outerRadius, cy - outerRadius)
-        )
+            // Draw horizontal/vertical lines representing axes (dividing the quadrants)
+            drawLine(
+                color = Color(0x1F23233E),
+                start = Offset(cx - outerRadius, cy),
+                end = Offset(cx + outerRadius, cy),
+                strokeWidth = 2f
+            )
+            drawLine(
+                color = Color(0x1F23233E),
+                start = Offset(cx, cy - outerRadius),
+                end = Offset(cx, cy + outerRadius),
+                strokeWidth = 2f
+            )
+            
+            // Draw directional quadrant indicator slices (subtle glow)
+            // East Slice: 315 to 45
+            drawArc(
+                color = ColorEast,
+                startAngle = -45f,
+                sweepAngle = 90f,
+                useCenter = true,
+                alpha = 0.04f,
+                size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
+                topLeft = Offset(cx - outerRadius, cy - outerRadius)
+            )
+            // South Slice: 45 to 135
+            drawArc(
+                color = ColorSouth,
+                startAngle = 45f,
+                sweepAngle = 90f,
+                useCenter = true,
+                alpha = 0.04f,
+                size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
+                topLeft = Offset(cx - outerRadius, cy - outerRadius)
+            )
+            // West Slice: 135 to 225
+            drawArc(
+                color = ColorWest,
+                startAngle = 135f,
+                sweepAngle = 90f,
+                useCenter = true,
+                alpha = 0.04f,
+                size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
+                topLeft = Offset(cx - outerRadius, cy - outerRadius)
+            )
+            // North Slice: 225 to 315
+            drawArc(
+                color = ColorNorth,
+                startAngle = 225f,
+                sweepAngle = 90f,
+                useCenter = true,
+                alpha = 0.04f,
+                size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2),
+                topLeft = Offset(cx - outerRadius, cy - outerRadius)
+            )
+        }
+
+        // North Label (Top)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 10.dp)
+                .background(Color(0xEE0F0F15), RoundedCornerShape(6.dp))
+                .border(BorderStroke(1.dp, ColorNorth.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "❄️ KIIWEDINONG (NORTH)",
+                color = ColorNorth,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        // East Label (Right)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 10.dp)
+                .background(Color(0xEE0F0F15), RoundedCornerShape(6.dp))
+                .border(BorderStroke(1.dp, ColorEast.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "WAABINONG (EAST) 🌸",
+                color = ColorEast,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        // South Label (Bottom)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 10.dp)
+                .background(Color(0xEE0F0F15), RoundedCornerShape(6.dp))
+                .border(BorderStroke(1.dp, ColorSouth.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "ZHAAWANONG (SOUTH) 🔥",
+                color = ColorSouth,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        // West Label (Left)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 10.dp)
+                .background(Color(0xEE0F0F15), RoundedCornerShape(6.dp))
+                .border(BorderStroke(1.dp, ColorWest.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "🌊 EPANGISHMOK (WEST)",
+                color = ColorWest,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
     }
 }
 
@@ -647,6 +745,7 @@ fun NodeInspectorPanel(
     allNodes: List<RelationalNode>,
     viewModel: MedicineWheelViewModel,
     modifier: Modifier = Modifier,
+    onConductCeremony: (RelationalEdge) -> Unit,
     onClose: () -> Unit
 ) {
     val nodeEdges = remember(node.id, edges) {
@@ -832,7 +931,7 @@ fun NodeInspectorPanel(
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Button(
-                                    onClick = { viewModel.honorEdgeWithCeremony(edge.id, "ceremony_custom") },
+                                    onClick = { onConductCeremony(edge) },
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (edge.ceremonyHonored) Color(0x33FFD700) else Color(0x1AFFD700)
@@ -1178,6 +1277,182 @@ fun LinkNodesDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = ColorEast, contentColor = Color.Black)
             ) {
                 Text("Weave Edge")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Dismiss", color = Color.Gray)
+            }
+        },
+        containerColor = Color(0xFF1E1E2E)
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun ConductCeremonyDialog(
+    edge: RelationalEdge,
+    allNodes: List<RelationalNode>,
+    onDismiss: () -> Unit,
+    onConduct: (
+        type: String,
+        direction: String,
+        participants: String,
+        medicines: String,
+        intentions: String,
+        context: String,
+        ceremonyId: String
+    ) -> Unit
+) {
+    val sourceNode = remember(edge.fromId, allNodes) { allNodes.find { it.id == edge.fromId } }
+    val targetNode = remember(edge.toId, allNodes) { allNodes.find { it.id == edge.toId } }
+
+    var ceremonyType by remember { mutableStateOf("Talking Circle") }
+    var participants by remember { mutableStateOf(listOfNotNull(sourceNode?.name, targetNode?.name).joinToString(", ")) }
+    var intentions by remember { 
+        mutableStateOf(
+            "To honor and kindle reciprocity between ${sourceNode?.name ?: "relative"} and ${targetNode?.name ?: "relative"} under standard OCAP guidelines."
+        ) 
+    }
+    
+    val availableMedicines = listOf("tobacco", "sage", "sweetgrass", "cedar", "strawberry")
+    var selectedMedicines by remember { mutableStateOf(setOf("tobacco")) }
+    
+    var researchContext by remember { mutableStateOf("Kinship Alignment Check") }
+    val targetDir = targetNode?.direction ?: "east"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Star, "Ceremony icon", tint = ColorEast, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Conduct Reciprocity Ceremony",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Serif
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "By honoring the relationship thread \"${edge.relationshipType}\", you validate sovereign accountability (Wilson Three R's) and elevate the general alignment index.",
+                    color = Color.LightGray,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+
+                HorizontalDivider(color = Color(0x33FFFFFF))
+
+                Text("Ceremony Type:", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                val ceremonyTypes = listOf("Talking Circle", "Smudging", "Spirit Feeding", "Sunrise Offering")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(ceremonyTypes) { type ->
+                            val selected = ceremonyType == type
+                            SuggestionChip(
+                                onClick = { ceremonyType = type },
+                                label = { Text(type, fontSize = 10.sp, color = if (selected) Color.Black else Color.White) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (selected) ColorEast else Color(0xFF23233E)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Text("Select Medicine Offerings:", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    items(availableMedicines) { med ->
+                        val selected = selectedMedicines.contains(med)
+                        val chipColor = when(med) {
+                            "tobacco" -> ColorEast
+                            "sage" -> ColorSouth
+                            "cedar" -> ColorWest
+                            "sweetgrass" -> ColorNorth
+                            else -> Color(0xFFE2583E)
+                        }
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                if (selected) {
+                                    selectedMedicines = selectedMedicines - med
+                                } else {
+                                    selectedMedicines = selectedMedicines + med
+                                }
+                            },
+                            label = { Text(med.replaceFirstChar { it.uppercase() }, fontSize = 10.sp, color = if (selected) Color.Black else Color.White) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = chipColor,
+                                containerColor = Color(0xFF23233E)
+                            )
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = participants,
+                    onValueChange = { participants = it },
+                    label = { Text("Ceremonial Participants", fontSize = 12.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = intentions,
+                    onValueChange = { intentions = it },
+                    label = { Text("Traditional Intentions", fontSize = 12.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+
+                OutlinedTextField(
+                    value = researchContext,
+                    onValueChange = { researchContext = it },
+                    label = { Text("Research Context Study", fontSize = 12.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val ceremonyId = "ceremony_${System.currentTimeMillis()}"
+                    onConduct(
+                        ceremonyType.lowercase().replace(" ", "_"),
+                        targetDir,
+                        participants,
+                        selectedMedicines.joinToString(", "),
+                        intentions,
+                        researchContext,
+                        ceremonyId
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ColorEast, contentColor = Color.Black)
+            ) {
+                Text("Consecrate Kinship Bond", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

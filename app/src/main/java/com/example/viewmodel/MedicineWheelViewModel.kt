@@ -147,9 +147,8 @@ class MedicineWheelViewModel(application: Application) : AndroidViewModel(applic
     }
 
     // Ceremony actions
-    fun logCeremony(type: String, direction: String, participants: String, medicines: String, intentions: String, context: String) {
+    fun logCeremony(type: String, direction: String, participants: String, medicines: String, intentions: String, context: String, id: String = "ceremony_${System.currentTimeMillis()}") {
         viewModelScope.launch {
-            val id = "ceremony_${System.currentTimeMillis()}"
             val log = CeremonyLog(
                 id = id,
                 type = type,
